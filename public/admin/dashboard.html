@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFlow - Administration</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #FF8904;
+            --primary-dark: #FFB86A;
+            --primary-light: #fff3e0;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --gray-900: #111827;
+            --gray-800: #1f2937;
+            --gray-700: #374151;
+            --gray-600: #4b5563;
+            --gray-500: #6b7280;
+            --gray-300: #d1d5db;
+            --gray-200: #e5e7eb;
+            --gray-100: #f3f4f6;
+            --gray-50: #f9fafb;
+            --white: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .logo-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+        .header-left h1 { font-size: 1.25rem; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .admin-badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .btn-logout {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--gray-600);
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .btn-logout:hover { background: var(--gray-100); }
+
+        /* Main */
+        .main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .toolbar-left { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+        .search-input {
+            padding: 0.6rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            width: 250px;
+            transition: border-color 0.3s;
+        }
+        .search-input:focus { outline: none; border-color: var(--primary); }
+        .filter-select {
+            padding: 0.6rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            background: var(--white);
+            cursor: pointer;
+        }
+        .btn-add {
+            padding: 0.65rem 1.25rem;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+        .btn-add:hover { background: var(--primary-dark); }
+
+        /* Table */
+        .table-container {
+            background: var(--white);
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: var(--gray-50); }
+        th {
+            padding: 0.85rem 1rem;
+            text-align: left;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--gray-500);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 0.85rem 1rem;
+            border-top: 1px solid var(--gray-100);
+            font-size: 0.9rem;
+        }
+        tr:hover td { background: var(--gray-50); }
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-etudiant { background: #dbeafe; color: #1d4ed8; }
+        .badge-encadrant { background: #fef3c7; color: #d97706; }
+        .badge-admin { background: #ede9fe; color: #7c3aed; }
+        .badge-actif { background: #dcfce7; color: #16a34a; }
+        .badge-inactif { background: #fee2e2; color: #dc2626; }
+        .actions { display: flex; gap: 0.5rem; }
+        .btn-action {
+            padding: 0.4rem 0.7rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: opacity 0.2s;
+        }
+        .btn-action:hover { opacity: 0.8; }
+        .btn-edit { background: #dbeafe; color: #1d4ed8; }
+        .btn-toggle-active { background: #fef3c7; color: #d97706; }
+        .btn-activate { background: #dcfce7; color: #16a34a; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal h2 { margin-bottom: 1.5rem; font-size: 1.25rem; }
+        .modal .form-group { margin-bottom: 1.25rem; }
+        .modal .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            font-size: 0.9rem;
+            color: var(--gray-700);
+        }
+        .modal .form-group input,
+        .modal .form-group select {
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
+        }
+        .modal .form-group input:focus,
+        .modal .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .modal-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+        }
+        .btn-modal {
+            padding: 0.65rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .btn-cancel { background: var(--gray-100); color: var(--gray-700); }
+        .btn-cancel:hover { background: var(--gray-200); }
+        .btn-save { background: var(--primary); color: var(--white); }
+        .btn-save:hover { background: var(--primary-dark); }
+
+        .hidden { display: none; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            color: var(--white);
+            font-weight: 500;
+            font-size: 0.9rem;
+            z-index: 2000;
+            animation: slideUp 0.3s ease;
+            display: none;
+        }
+        .toast.show { display: block; }
+        .toast.success { background: #16a34a; }
+        .toast.error { background: #dc2626; }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--gray-500);
+        }
+
+        @media (max-width: 768px) {
+            .main { padding: 1rem; }
+            .toolbar { flex-direction: column; align-items: stretch; }
+            .toolbar-left { flex-direction: column; }
+            .search-input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo-icon">PF</div>
+            <h1>Administration</h1>
+        </div>
+        <div class="header-right">
+            <span class="admin-badge"><i class="fas fa-shield"></i> Admin</span>
+            <span id="adminName"></span>
+            <button class="btn-logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <input type="text" class="search-input" id="searchInput" placeholder="Rechercher un utilisateur..." />
+                <select class="filter-select" id="roleFilter">
+                    <option value="">Tous les rôles</option>
+                    <option value="etudiant">Étudiants</option>
+                    <option value="encadrant">Encadrants</option>
+                    <option value="admin">Admins</option>
+                </select>
+            </div>
+            <button class="btn-add" id="addUserBtn">
+                <i class="fas fa-plus"></i> Ajouter un utilisateur
+            </button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Prénom</th>
+                        <th>Email</th>
+                        <th>Rôle</th>
+                        <th>Classe / Matière</th>
+                        <th>Statut</th>
+                        <th>Inscription</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTable"></tbody>
+            </table>
+            <div class="empty-state hidden" id="emptyState">
+                <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                <p>Aucun utilisateur trouvé</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2 id="modalTitle">Ajouter un utilisateur</h2>
+            <form id="userForm">
+                <input type="hidden" id="userId" />
+
+                <div class="form-group">
+                    <label for="userRole">Type d'utilisateur</label>
+                    <select id="userRole" required>
+                        <option value="">-- Choisir --</option>
+                        <option value="etudiant">Étudiant</option>
+                        <option value="encadrant">Encadrant</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="userNom">Nom</label>
+                    <input type="text" id="userNom" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="userPrenom">Prénom</label>
+                    <input type="text" id="userPrenom" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="userEmail">Email</label>
+                    <input type="email" id="userEmail" required />
+                </div>
+
+                <div class="form-group hidden" id="classeGroup">
+                    <label for="userClasse">Classe</label>
+                    <select id="userClasse">
+                        <option value="">-- Choisir --</option>
+                        <option value="ISEN 1">ISEN 1</option>
+                        <option value="ISEN 2">ISEN 2</option>
+                        <option value="ISEN 3">ISEN 3</option>
+                        <option value="ISEN 4">ISEN 4</option>
+                        <option value="ISEN 5">ISEN 5</option>
+                    </select>
+                </div>
+
+                <div class="form-group hidden" id="matiereGroup">
+                    <label for="userMatiere">Matière</label>
+                    <input type="text" id="userMatiere" />
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-modal btn-cancel" id="cancelBtn">Annuler</button>
+                    <button type="submit" class="btn-modal btn-save" id="saveBtn">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API = "";
+        let editingId = null;
+
+        // DOM
+        const usersTable = document.getElementById("usersTable");
+        const searchInput = document.getElementById("searchInput");
+        const roleFilter = document.getElementById("roleFilter");
+        const addUserBtn = document.getElementById("addUserBtn");
+        const modalOverlay = document.getElementById("modalOverlay");
+        const userForm = document.getElementById("userForm");
+        const modalTitle = document.getElementById("modalTitle");
+        const cancelBtn = document.getElementById("cancelBtn");
+        const logoutBtn = document.getElementById("logoutBtn");
+        const emptyState = document.getElementById("emptyState");
+        const toast = document.getElementById("toast");
+        const userRole = document.getElementById("userRole");
+        const classeGroup = document.getElementById("classeGroup");
+        const matiereGroup = document.getElementById("matiereGroup");
+
+        // Check auth
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API}/api/auth/me`, { credentials: "include" });
+                const data = await res.json();
+                if (!data.success || data.role !== "admin") {
+                    window.location.href = "/login.html";
+                    return;
+                }
+                document.getElementById("adminName").textContent = `${data.utilisateur.prenom} ${data.utilisateur.nom}`;
+            } catch {
+                window.location.href = "/login.html";
+            }
+        }
+
+        // Toast
+        function showToast(message, type = "success") {
+            toast.textContent = message;
+            toast.className = `toast show ${type}`;
+            setTimeout(() => { toast.className = "toast"; }, 3000);
+        }
+
+        // Load users
+        async function loadUsers() {
+            const role = roleFilter.value;
+            const search = searchInput.value.trim();
+            let url = `${API}/api/admin/users?`;
+            if (role) url += `role=${role}&`;
+            if (search) url += `search=${encodeURIComponent(search)}`;
+
+            try {
+                const res = await fetch(url, { credentials: "include" });
+                const data = await res.json();
+
+                if (!data.success) {
+                    if (res.status === 401) {
+                        window.location.href = "/login.html";
+                        return;
+                    }
+                    showToast(data.message, "error");
+                    return;
+                }
+
+                renderTable(data.users);
+            } catch {
+                showToast("Erreur de connexion au serveur", "error");
+            }
+        }
+
+        // Render table
+        function renderTable(users) {
+            if (users.length === 0) {
+                usersTable.innerHTML = "";
+                emptyState.classList.remove("hidden");
+                return;
+            }
+            emptyState.classList.add("hidden");
+
+            usersTable.innerHTML = users.map(u => {
+                const role = u.est_admin ? "admin" : u.est_encadrant ? "encadrant" : "etudiant";
+                const roleLabel = u.est_admin ? "Admin" : u.est_encadrant ? "Encadrant" : "Étudiant";
+                const roleBadgeClass = `badge-${role}`;
+                const classeMatiere = u.classe || u.matiere || "—";
+                const statusBadge = u.est_actif
+                    ? '<span class="badge badge-actif">Actif</span>'
+                    : '<span class="badge badge-inactif">Inactif</span>';
+                const date = new Date(u.date_inscription).toLocaleDateString("fr-FR");
+                const toggleLabel = u.est_actif ? "Désactiver" : "Activer";
+                const toggleClass = u.est_actif ? "btn-toggle-active" : "btn-activate";
+                const toggleIcon = u.est_actif ? "fa-ban" : "fa-check";
+
+                return `<tr>
+                    <td>${escapeHtml(u.nom)}</td>
+                    <td>${escapeHtml(u.prenom)}</td>
+                    <td>${escapeHtml(u.email)}</td>
+                    <td><span class="badge ${roleBadgeClass}">${roleLabel}</span></td>
+                    <td>${escapeHtml(classeMatiere)}</td>
+                    <td>${statusBadge}</td>
+                    <td>${date}</td>
+                    <td class="actions">
+                        <button class="btn-action btn-edit" onclick="editUser(${u.id_utilisateur})" title="Modifier">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="btn-action ${toggleClass}" onclick="toggleActive(${u.id_utilisateur})" title="${toggleLabel}">
+                            <i class="fas ${toggleIcon}"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join("");
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement("div");
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Role change -> show/hide fields
+        userRole.addEventListener("change", () => {
+            classeGroup.classList.toggle("hidden", userRole.value !== "etudiant");
+            matiereGroup.classList.toggle("hidden", userRole.value !== "encadrant");
+        });
+
+        // Open modal - Add
+        addUserBtn.addEventListener("click", () => {
+            editingId = null;
+            modalTitle.textContent = "Ajouter un utilisateur";
+            userForm.reset();
+            classeGroup.classList.add("hidden");
+            matiereGroup.classList.add("hidden");
+            modalOverlay.classList.add("active");
+        });
+
+        // Open modal - Edit
+        async function editUser(id) {
+            try {
+                const res = await fetch(`${API}/api/admin/users/${id}`, { credentials: "include" });
+                const data = await res.json();
+                if (!data.success) { showToast(data.message, "error"); return; }
+
+                const u = data.user;
+                editingId = u.id_utilisateur;
+                modalTitle.textContent = "Modifier l'utilisateur";
+
+                document.getElementById("userId").value = u.id_utilisateur;
+                document.getElementById("userNom").value = u.nom;
+                document.getElementById("userPrenom").value = u.prenom;
+                document.getElementById("userEmail").value = u.email;
+
+                const role = u.est_admin ? "admin" : u.est_encadrant ? "encadrant" : "etudiant";
+                userRole.value = role;
+                userRole.dispatchEvent(new Event("change"));
+
+                if (role === "etudiant") {
+                    document.getElementById("userClasse").value = u.classe || "";
+                }
+                if (role === "encadrant") {
+                    document.getElementById("userMatiere").value = u.matiere || "";
+                }
+
+                modalOverlay.classList.add("active");
+            } catch {
+                showToast("Erreur lors du chargement", "error");
+            }
+        }
+
+        // Close modal
+        cancelBtn.addEventListener("click", closeModal);
+        modalOverlay.addEventListener("click", (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+        function closeModal() {
+            modalOverlay.classList.remove("active");
+            editingId = null;
+        }
+
+        // Submit form
+        userForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const body = {
+                nom: document.getElementById("userNom").value.trim(),
+                prenom: document.getElementById("userPrenom").value.trim(),
+                email: document.getElementById("userEmail").value.trim(),
+                role: userRole.value,
+                classe: document.getElementById("userClasse").value,
+                matiere: document.getElementById("userMatiere").value.trim()
+            };
+
+            if (!body.nom || !body.prenom || !body.email || !body.role) {
+                showToast("Veuillez remplir tous les champs obligatoires", "error");
+                return;
+            }
+
+            try {
+                let res;
+                if (editingId) {
+                    res = await fetch(`${API}/api/admin/users/${editingId}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify(body)
+                    });
+                } else {
+                    res = await fetch(`${API}/api/admin/users`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify(body)
+                    });
+                }
+
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(data.message);
+                    closeModal();
+                    loadUsers();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch {
+                showToast("Erreur de connexion au serveur", "error");
+            }
+        });
+
+        // Toggle active
+        async function toggleActive(id) {
+            try {
+                const res = await fetch(`${API}/api/admin/users/${id}/toggle-active`, {
+                    method: "PATCH",
+                    credentials: "include"
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message);
+                    loadUsers();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch {
+                showToast("Erreur de connexion au serveur", "error");
+            }
+        }
+
+        // Logout
+        logoutBtn.addEventListener("click", async () => {
+            await fetch(`${API}/api/auth/logout`, { method: "POST", credentials: "include" });
+            window.location.href = "/login.html";
+        });
+
+        // Search & filter
+        let searchTimeout;
+        searchInput.addEventListener("input", () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(loadUsers, 300);
+        });
+        roleFilter.addEventListener("change", loadUsers);
+
+        // Init
+        checkAuth();
+        loadUsers();
+    </script>
+</body>
+</html>

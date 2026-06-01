@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFlow - Activer mon compte</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #FF8904;
+            --primary-dark: #FFB86A;
+            --primary-light: #dbeafe;
+            --danger: #ef4444;
+            --gray-900: #111827;
+            --gray-600: #4b5563;
+            --gray-200: #e5e7eb;
+            --gray-100: #f3f4f6;
+            --gray-50: #f9fafb;
+            --white: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--gray-50);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .card {
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 3rem;
+            max-width: 450px;
+            width: 100%;
+        }
+        .card h1 {
+            font-size: 1.5rem;
+            color: var(--gray-900);
+            margin-bottom: 0.5rem;
+        }
+        .card p.subtitle {
+            color: var(--gray-600);
+            margin-bottom: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--gray-900);
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .btn {
+            width: 100%;
+            padding: 0.85rem;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: var(--primary-dark); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .message {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+            font-size: 0.9rem;
+        }
+        .message.error { display: block; background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+        .message.success { display: block; background: #dcfce7; color: #16a34a; border: 1px solid #86efac; }
+        .logo { text-align: center; margin-bottom: 2rem; }
+        .logo-icon {
+            display: inline-flex;
+            width: 48px; height: 48px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 12px;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+            font-weight: 700;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">
+            <div class="logo-icon">PF</div>
+        </div>
+        <h1>Activez votre compte</h1>
+        <p class="subtitle">Définissez votre mot de passe pour accéder à ProjectFlow.</p>
+
+        <div id="message" class="message"></div>
+
+        <form id="activateForm">
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" placeholder="Minimum 6 caractères" required minlength="6" />
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Confirmer le mot de passe</label>
+                <input type="password" id="confirmPassword" placeholder="Retapez votre mot de passe" required minlength="6" />
+            </div>
+            <button type="submit" class="btn" id="submitBtn">Activer mon compte</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById("activateForm");
+        const messageEl = document.getElementById("message");
+        const submitBtn = document.getElementById("submitBtn");
+
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+
+        if (!token) {
+            messageEl.textContent = "Lien d'activation invalide. Aucun token fourni.";
+            messageEl.className = "message error";
+            form.style.display = "none";
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            messageEl.className = "message";
+            messageEl.style.display = "none";
+
+            const password = document.getElementById("password").value;
+            const confirm = document.getElementById("confirmPassword").value;
+
+            if (password.length < 6) {
+                messageEl.textContent = "Le mot de passe doit contenir au moins 6 caractères.";
+                messageEl.className = "message error";
+                return;
+            }
+
+            if (password !== confirm) {
+                messageEl.textContent = "Les mots de passe ne correspondent pas.";
+                messageEl.className = "message error";
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Activation...";
+
+            try {
+                const res = await fetch("/api/auth/activate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ token, password })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    messageEl.textContent = "Compte activé ! Redirection vers la connexion...";
+                    messageEl.className = "message success";
+                    form.style.display = "none";
+                    setTimeout(() => { window.location.href = "/login.html"; }, 2000);
+                } else {
+                    messageEl.textContent = data.message;
+                    messageEl.className = "message error";
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Activer mon compte";
+                }
+            } catch (err) {
+                messageEl.textContent = "Impossible de contacter le serveur.";
+                messageEl.className = "message error";
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Activer mon compte";
+            }
+        });
+    </script>
+</body>
+</html>

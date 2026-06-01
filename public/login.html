@@ -730,12 +730,13 @@
             // Simulate API call
             try {
                 const response = await fetch(
-                    "http://localhost:5000/api/auth/login",
+                    "/api/auth/login",
                     {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
                         },
+                        credentials: "include",
                         body: JSON.stringify({
                             email: email,
                             password: password,
@@ -789,7 +790,7 @@
 
                         etudiant: '/dashboard-student.html',
                         encadrant: '/dashboard-instructor.html',
-                        admin: '/dashboard-admin.html'
+                        admin: '/admin/dashboard.html'
 
                     };
 
