@@ -15,14 +15,6 @@ npm run dev
 
 La base a changé : il faut supprimer l'ancienne et la recréer avec le nouveau schéma.
 
-```sql
-DROP DATABASE IF EXISTS plateforme_projets;
-CREATE DATABASE plateforme_projets;
-```
-
-```bash
-mysql -u root -p plateforme_projets < plateforme_projets.sql
-```
 
 ## Connexion admin
 
