@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Mes Projets</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        .project-card { position: relative; text-decoration: none; color: inherit; display: block; transition: border-color var(--transition); }
+        .project-card:hover { border-color: var(--gray-300); }
+        .project-actions { position: absolute; top: 0.6rem; right: 0.6rem; display: flex; gap: 0.15rem; }
+        .project-actions button { background: none; border: none; cursor: pointer; padding: 0.25rem 0.4rem; border-radius: var(--radius-sm); font-size: 0.75rem; transition: background var(--transition); }
+        .project-actions .edit-btn { color: var(--gray-400); }
+        .project-actions .edit-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+        .project-actions .delete-btn { color: var(--gray-400); }
+        .project-actions .delete-btn:hover { background: var(--danger-light); color: var(--danger); }
+        .promo-badge { font-size: 0.68rem; background: var(--gray-100); color: var(--gray-600); padding: 0.12rem 0.4rem; border-radius: var(--radius-sm); font-weight: 500; }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Accueil &rsaquo; Projets</div>
+                <h1>Mes Projets</h1>
+            </div>
+            <a href="/encadrant/project-new.html" class="btn btn-primary"><i class="fas fa-plus"></i> Nouveau Projet</a>
+        </header>
+        <main class="page-content">
+            <div id="projectsGrid" class="grid-2"></div>
+        </main>
+    </div>
+
+    <!-- Modal confirmation suppression -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal" style="max-width:400px;">
+            <h2 style="color:var(--danger);"><i class="fas fa-exclamation-triangle"></i> Supprimer le projet</h2>
+            <p style="margin:1rem 0;color:var(--gray-600);">Cette action supprimera le projet et tous ses groupes, sujets et documents associés. Cette action est irréversible.</p>
+            <p style="font-weight:600;margin-bottom:1rem;" id="deleteProjectName"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="cancelDelete">Annuler</button>
+                <button type="button" class="btn" style="background:var(--danger);color:#fff;" id="confirmDelete">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("projects");
+
+        let deleteTargetId = null;
+
+        async function load() {
+            await checkEncadrantAuth();
+            const res = await fetch("/api/encadrant/projects", { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) return;
+
+            if (data.projects.length === 0) {
+                document.getElementById("projectsGrid").innerHTML = '<p style="color:var(--gray-500);">Aucun projet. <a href="/encadrant/project-new.html">Créer votre premier projet</a></p>';
+                return;
+            }
+
+            document.getElementById("projectsGrid").innerHTML = data.projects.map(p => `
+                <div class="card project-card">
+                    <div class="project-actions">
+                        <button class="edit-btn" title="Modifier" onclick="event.stopPropagation(); window.location.href='/encadrant/project-edit.html?id=${p.id_projet}'"><i class="fas fa-pen"></i></button>
+                        <button class="delete-btn" title="Supprimer" onclick="event.stopPropagation(); confirmDeleteProject(${p.id_projet}, '${esc(p.nom)}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                    <a href="/encadrant/project.html?id=${p.id_projet}" style="text-decoration:none;color:inherit;display:block;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+                            <h3 style="font-size:1rem;font-weight:600;">${esc(p.nom)}</h3>
+                            ${p.promo ? `<span class="promo-badge">${esc(p.promo)}</span>` : ''}
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+                            <span class="badge badge-success"><span class="badge-dot"></span> ${p.etat}</span>
+                        </div>
+                        <p style="font-size:0.85rem;color:var(--gray-600);margin-bottom:1rem;">${esc(p.description || 'Aucune description')}</p>
+                        <div style="display:flex;gap:1.5rem;font-size:0.8rem;color:var(--gray-500);">
+                            <span><i class="fas fa-users"></i> ${p.nb_groupes} groupes</span>
+                            <span><i class="fas fa-calendar"></i> ${new Date(p.date_debut).toLocaleDateString('fr-FR')} - ${new Date(p.date_fin).toLocaleDateString('fr-FR')}</span>
+                        </div>
+                    </a>
+                </div>
+            `).join("");
+        }
+
+        function confirmDeleteProject(id, name) {
+            deleteTargetId = id;
+            document.getElementById("deleteProjectName").textContent = name;
+            document.getElementById("deleteModal").classList.add("active");
+        }
+
+        document.getElementById("cancelDelete").addEventListener("click", () => {
+            document.getElementById("deleteModal").classList.remove("active");
+            deleteTargetId = null;
+        });
+
+        document.getElementById("deleteModal").addEventListener("click", (e) => {
+            if (e.target === document.getElementById("deleteModal")) {
+                document.getElementById("deleteModal").classList.remove("active");
+                deleteTargetId = null;
+            }
+        });
+
+        document.getElementById("confirmDelete").addEventListener("click", async () => {
+            if (!deleteTargetId) return;
+            const res = await fetch(`/api/encadrant/projects/${deleteTargetId}`, {
+                method: "DELETE",
+                credentials: "include"
+            });
+            const data = await res.json();
+            document.getElementById("deleteModal").classList.remove("active");
+            if (data.success) {
+                showToast("Projet supprimé");
+                load();
+            } else {
+                showToast(data.message, "error");
+            }
+            deleteTargetId = null;
+        });
+
+        function esc(str) { const d = document.createElement("div"); d.textContent = str || ""; return d.innerHTML; }
+        function showToast(msg, type = "success") {
+            const t = document.getElementById("toast");
+            t.textContent = msg; t.className = `toast show ${type}`;
+            setTimeout(() => t.className = "toast", 3000);
+        }
+
+        load();
+    </script>
+</body>
+</html>

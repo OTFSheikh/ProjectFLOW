@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Suivi Groupe</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb"><a href="/encadrant/projects.html">Projets</a> &rsaquo; <span id="bcProject">...</span> &rsaquo; <span id="bcGroup">...</span></div>
+                <h1 id="groupTitle">...</h1>
+                <p id="groupSubtitle" style="font-size:0.85rem;color:var(--gray-500);margin-top:0.25rem;"></p>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div id="progressBadge"></div>
+                <button class="btn btn-secondary btn-sm" id="editGroupBtn"><i class="fas fa-pen"></i> Modifier</button>
+            </div>
+        </header>
+        <main class="page-content">
+            <div class="tabs" id="tabsNav">
+                <button class="tab active" data-tab="apercu">Aperçu</button>
+                <button class="tab" data-tab="membres">Membres</button>
+                <button class="tab" data-tab="taches">Tâches</button>
+                <button class="tab" data-tab="messages">Messages</button>
+                <button class="tab" data-tab="notes">Notes</button>
+                <button class="tab" data-tab="livrables">Livrables</button>
+                <button class="tab" data-tab="evaluation">Évaluation</button>
+            </div>
+
+            <div class="tab-content active" id="tab-apercu"></div>
+            <div class="tab-content" id="tab-membres"></div>
+            <div class="tab-content" id="tab-taches"></div>
+            <div class="tab-content" id="tab-messages"></div>
+            <div class="tab-content" id="tab-notes"></div>
+            <div class="tab-content" id="tab-livrables"></div>
+            <div class="tab-content" id="tab-evaluation"></div>
+        </main>
+    </div>
+    <!-- Modal modifier groupe -->
+    <div class="modal-overlay" id="editGroupModal">
+        <div class="modal">
+            <h2>Modifier le groupe</h2>
+            <form id="editGroupForm">
+                <div class="form-group">
+                    <label for="editGroupName">Nom du groupe</label>
+                    <input type="text" id="editGroupName" required />
+                </div>
+                <div class="form-group">
+                    <label>Membres</label>
+                    <div id="editStudentsList" style="max-height:250px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:0.5rem;"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelEditGroup">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("projects");
+
+        const params = new URLSearchParams(window.location.search);
+        const groupId = params.get("id");
+        if (!groupId) window.location.href = "/encadrant/projects.html";
+
+        let groupData = null;
+        let membresData = [];
+
+        // Tabs
+        document.querySelectorAll(".tab").forEach(tab => {
+            tab.addEventListener("click", () => {
+                document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+                tab.classList.add("active");
+                document.getElementById(`tab-${tab.dataset.tab}`).classList.add("active");
+                loadTab(tab.dataset.tab);
+            });
+        });
+
+        async function load() {
+            await checkEncadrantAuth();
+            const res = await fetch(`/api/encadrant/groups/${groupId}`, { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) { window.location.href = "/encadrant/projects.html"; return; }
+
+            groupData = data.group;
+            membresData = data.membres;
+
+            document.getElementById("bcProject").textContent = groupData.projet_nom;
+            document.getElementById("bcGroup").textContent = groupData.nom;
+            document.getElementById("groupTitle").textContent = groupData.nom;
+            document.getElementById("groupSubtitle").textContent = groupData.sujet_titre ? `Sujet : ${groupData.sujet_titre}` : "";
+            document.getElementById("progressBadge").innerHTML = `
+                <span class="badge badge-success"><span class="badge-dot"></span> ${groupData.etat}</span>
+            `;
+
+            const initialTab = params.get("tab") || "apercu";
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+            const targetTab = document.querySelector(`.tab[data-tab="${initialTab}"]`);
+            if (targetTab) targetTab.classList.add("active");
+            document.getElementById(`tab-${initialTab}`).classList.add("active");
+            loadTab(initialTab);
+        }
+
+        // --- MODIFIER GROUPE ---
+        const editGroupModal = document.getElementById("editGroupModal");
+        document.getElementById("editGroupBtn").addEventListener("click", async () => {
+            document.getElementById("editGroupName").value = groupData.nom;
+            const res = await fetch("/api/encadrant/students", { credentials: "include" });
+            const data = await res.json();
+            if (data.success) {
+                const currentMemberIds = membresData.map(m => m.id_utilisateur);
+                document.getElementById("editStudentsList").innerHTML = data.students.map(s => `
+                    <label style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem;border-radius:6px;cursor:pointer;">
+                        <input type="checkbox" value="${s.id_utilisateur}" ${currentMemberIds.includes(s.id_utilisateur) ? 'checked' : ''} />
+                        <span>${esc(s.prenom)} ${esc(s.nom)} <small style="color:var(--gray-400);">(${s.classe || ''})</small></span>
+                    </label>
+                `).join("");
+            }
+            editGroupModal.classList.add("active");
+        });
+
+        document.getElementById("cancelEditGroup").addEventListener("click", () => editGroupModal.classList.remove("active"));
+        editGroupModal.addEventListener("click", (e) => { if (e.target === editGroupModal) editGroupModal.classList.remove("active"); });
+
+        document.getElementById("editGroupForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const nom = document.getElementById("editGroupName").value.trim();
+            const membres = [...document.querySelectorAll('#editStudentsList input:checked')].map(el => parseInt(el.value));
+
+            const res = await fetch(`/api/encadrant/groups/${groupId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ nom, membres })
+            });
+            const data = await res.json();
+            if (data.success) {
+                editGroupModal.classList.remove("active");
+                showToast("Groupe modifié");
+                // Recharger les données
+                const r = await fetch(`/api/encadrant/groups/${groupId}`, { credentials: "include" });
+                const d = await r.json();
+                if (d.success) {
+                    groupData = d.group;
+                    membresData = d.membres;
+                    document.getElementById("bcGroup").textContent = groupData.nom;
+                    document.getElementById("groupTitle").textContent = groupData.nom;
+                    loadTab(document.querySelector(".tab.active").dataset.tab);
+                }
+            } else {
+                showToast(data.message, "error");
+            }
+        });
+
+        function loadTab(tab) {
+            switch(tab) {
+                case "apercu": renderApercu(); break;
+                case "membres": renderMembres(); break;
+                case "taches": renderTaches(); break;
+                case "messages": renderMessages(); break;
+                case "notes": renderNotes(); break;
+                case "livrables": renderLivrables(); break;
+                case "evaluation": renderEvaluation(); break;
+            }
+        }
+
+        async function renderApercu() {
+            const leader = membresData.find(m => m.est_team_leader);
+
+            const res = await fetch(`/api/encadrant/groups/${groupId}/tasks`, { credentials: "include" });
+            const data = await res.json();
+            const tasks = data.success ? data.tasks : [];
+            const total = tasks.length;
+            const done = tasks.filter(t => t.statut === "Termine").length;
+            const enCours = tasks.filter(t => t.statut === "En_cours").length;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+            document.getElementById("tab-apercu").innerHTML = `
+                <div class="grid-2" style="margin-bottom:1.5rem;">
+                    <div class="card">
+                        <h3 style="font-size:0.95rem;margin-bottom:1rem;">Informations</h3>
+                        <p style="font-size:0.85rem;color:var(--gray-600);margin-bottom:0.5rem;"><strong>Projet :</strong> ${esc(groupData.projet_nom)}</p>
+                        <p style="font-size:0.85rem;color:var(--gray-600);margin-bottom:0.5rem;"><strong>Sujet :</strong> ${esc(groupData.sujet_titre || 'Non attribué')}</p>
+                        <p style="font-size:0.85rem;color:var(--gray-600);margin-bottom:0.5rem;"><strong>Team Leader :</strong> ${leader ? esc(leader.prenom + ' ' + leader.nom) : 'Non désigné'}</p>
+                        <p style="font-size:0.85rem;color:var(--gray-600);"><strong>Membres :</strong> ${membresData.length}</p>
+                    </div>
+                    <div class="card">
+                        <h3 style="font-size:0.95rem;margin-bottom:1rem;">Statut</h3>
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+                            <span class="badge badge-success"><span class="badge-dot"></span> ${groupData.etat}</span>
+                        </div>
+                        <p style="font-size:0.8rem;color:var(--gray-500);">Créé le ${new Date(groupData.date_creation).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 style="font-size:0.95rem;margin-bottom:1rem;">Progression</h3>
+                    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem;">
+                        <div class="progress-bar" style="flex:1;height:10px;">
+                            <div class="progress-fill" style="width:${pct}%"></div>
+                        </div>
+                        <span style="font-weight:700;font-size:1.1rem;">${pct}%</span>
+                    </div>
+                    <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:1rem;">${done} / ${total} tâches terminées</p>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon primary"><i class="fas fa-list"></i></div><div><div class="stat-label">Total</div><div class="stat-value">${total}</div></div></div>
+                        <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-spinner"></i></div><div><div class="stat-label">En cours</div><div class="stat-value">${enCours}</div></div></div>
+                        <div class="stat-card"><div class="stat-icon green"><i class="fas fa-check"></i></div><div><div class="stat-label">Terminées</div><div class="stat-value">${done}</div></div></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMembres() {
+            document.getElementById("tab-membres").innerHTML = `
+                <div style="background:var(--primary-light);border:1px solid var(--primary);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:var(--primary-dark);">
+                    <i class="fas fa-info-circle"></i> Désignez le Team Leader après concertation avec les étudiants.
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                    ${membresData.map(m => `
+                        <div class="member-card ${m.est_team_leader ? 'leader' : ''}">
+                            <div class="member-info">
+                                <div class="member-avatar">${m.prenom[0]}${m.nom[0]}</div>
+                                <div>
+                                    <div class="member-name">${esc(m.prenom)} ${esc(m.nom)} ${m.est_team_leader ? '<span class="badge badge-warning" style="margin-left:0.5rem;">Team Leader</span>' : ''}</div>
+                                    <div class="member-detail">${m.classe || ''} &bull; ${esc(m.email)}</div>
+                                </div>
+                            </div>
+                            ${!m.est_team_leader ? `<button class="btn btn-primary btn-sm" onclick="setLeader(${m.id_utilisateur})"><i class="fas fa-crown"></i> Désigner TL</button>` : ''}
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+        }
+
+        async function setLeader(userId) {
+            const res = await fetch(`/api/encadrant/groups/${groupId}/team-leader`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ userId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("Team Leader désigné");
+                membresData.forEach(m => m.est_team_leader = (m.id_utilisateur === userId));
+                renderMembres();
+            } else { showToast(data.message, "error"); }
+        }
+
+
+        async function renderTaches() {
+            const res = await fetch(`/api/encadrant/groups/${groupId}/tasks`, { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) return;
+            const tasks = data.tasks;
+
+            const cols = { "A_faire": [], "En_cours": [], "Termine": [] };
+            tasks.forEach(t => { if (cols[t.statut]) cols[t.statut].push(t); else cols["A_faire"].push(t); });
+
+            const colLabels = { "A_faire": "À faire", "En_cours": "En cours", "Termine": "Terminé" };
+            const dotColors = { "A_faire": "var(--gray-400)", "En_cours": "var(--primary)", "Termine": "var(--secondary)" };
+
+            document.getElementById("tab-taches").innerHTML = `
+                <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:1rem;"><i class="fas fa-eye"></i> Vue en lecture seule — les tâches sont gérées par le Team Leader.</p>
+                <div class="kanban-board">
+                    ${Object.entries(cols).map(([key, items]) => `
+                        <div class="kanban-column">
+                            <div class="kanban-header">
+                                <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColors[key]};margin-right:0.5rem;"></span>${colLabels[key]}</span>
+                                <span class="count">${items.length}</span>
+                            </div>
+                            <div class="kanban-cards">
+                                ${items.length === 0 ? '<p style="font-size:0.8rem;color:var(--gray-400);text-align:center;">Aucune tâche</p>' : items.map(t => `
+                                    <div class="kanban-card">
+                                        <h4>${esc(t.titre)}</h4>
+                                        <div class="meta">
+                                            <span><i class="fas fa-calendar"></i> ${new Date(t.date_limite).toLocaleDateString('fr-FR')}</span>
+                                            <span class="badge ${t.priorite === 'Haute' ? 'badge-danger' : t.priorite === 'Moyenne' ? 'badge-warning' : 'badge-gray'}">${t.priorite}</span>
+                                        </div>
+                                        ${t.assignes ? `<div style="font-size:0.7rem;color:var(--gray-500);margin-top:0.4rem;"><i class="fas fa-user"></i> ${esc(t.assignes)}</div>` : ''}
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+        }
+
+        async function renderMessages() {
+            const res = await fetch(`/api/encadrant/groups/${groupId}/messages`, { credentials: "include" });
+            const data = await res.json();
+
+            const myId = (await (await fetch("/api/auth/me", { credentials: "include" })).json()).utilisateur.id_utilisateur;
+
+            document.getElementById("tab-messages").innerHTML = `
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        ${(!data.success || data.messages.length === 0) ? '<p style="text-align:center;color:var(--gray-400);padding:2rem;">Aucun message pour le moment.</p>' :
+                        data.messages.map(m => `
+                            <div class="chat-bubble ${m.id_utilisateur === myId ? 'sent' : 'received'}">
+                                <div class="sender">${esc(m.prenom)} ${esc(m.nom)}</div>
+                                ${esc(m.contenu)}
+                                <div class="time">${new Date(m.date_envoi).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</div>
+                            </div>
+                        `).join("")}
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" id="msgInput" placeholder="Écrire un message..." />
+                        <button id="sendMsgBtn"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            `;
+
+            const chatEl = document.getElementById("chatMessages");
+            chatEl.scrollTop = chatEl.scrollHeight;
+
+            document.getElementById("sendMsgBtn").addEventListener("click", sendMessage);
+            document.getElementById("msgInput").addEventListener("keypress", (e) => { if (e.key === "Enter") sendMessage(); });
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("msgInput");
+            const contenu = input.value.trim();
+            if (!contenu) return;
+            input.value = "";
+            await fetch(`/api/encadrant/groups/${groupId}/messages`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ contenu })
+            });
+            renderMessages();
+        }
+
+        async function renderLivrables() {
+            const res = await fetch(`/api/encadrant/groups/${groupId}/deliverables`, { credentials: "include" });
+            const data = await res.json();
+
+            document.getElementById("tab-livrables").innerHTML = `
+                ${(!data.success || data.deliverables.length === 0) ? '<p style="color:var(--gray-500);">Aucun livrable déposé.</p>' : `
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>Nom</th><th>Déposé par</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+                            <tbody>
+                                ${data.deliverables.map(l => `
+                                    <tr>
+                                        <td>${esc(l.nom)}</td>
+                                        <td>${esc(l.deposant_prenom)} ${esc(l.deposant_nom)}</td>
+                                        <td>${new Date(l.date_depot).toLocaleDateString('fr-FR')}</td>
+                                        <td><span class="badge ${l.statut_validation === 'Valide' ? 'badge-success' : l.statut_validation === 'Rejete' ? 'badge-danger' : 'badge-warning'}">${l.statut_validation}</span></td>
+                                        <td>
+                                            ${l.statut_validation === 'En_attente' ? `
+                                                <button class="btn btn-primary btn-sm" onclick="validateLivrable(${l.id_livrable}, 'Valide')"><i class="fas fa-check"></i></button>
+                                                <button class="btn btn-secondary btn-sm" onclick="validateLivrable(${l.id_livrable}, 'Rejete')"><i class="fas fa-times"></i></button>
+                                            ` : '—'}
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            `;
+        }
+
+        async function validateLivrable(id, statut) {
+            await fetch(`/api/encadrant/deliverables/${id}/validate`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ statut })
+            });
+            showToast(statut === "Valide" ? "Livrable validé" : "Livrable rejeté");
+            renderLivrables();
+        }
+
+        async function renderEvaluation() {
+            const res = await fetch(`/api/encadrant/groups/${groupId}/evaluation`, { credentials: "include" });
+            const data = await res.json();
+
+            const pRes = await fetch(`/api/encadrant/projects/${groupData.id_projet}`, { credentials: "include" });
+            const pData = await pRes.json();
+            const criteres = pData.criteres || [];
+
+            if (criteres.length === 0) {
+                document.getElementById("tab-evaluation").innerHTML = '<p style="color:var(--gray-500);">Aucun critère d\'évaluation défini pour ce projet.</p>';
+                return;
+            }
+
+            const existingNotes = data.notes || [];
+            const evaluation = data.evaluation;
+
+            document.getElementById("tab-evaluation").innerHTML = `
+                <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;">
+                    <div>
+                        ${criteres.map(c => {
+                            const existing = existingNotes.find(n => n.id_critere === c.id_critere);
+                            const val = existing ? existing.note : 0;
+                            return `
+                                <div class="criteria-card">
+                                    <h4>${esc(c.nom)}</h4>
+                                    <p>${esc(c.description || '')}</p>
+                                    <div class="score">
+                                        <input type="range" min="0" max="${c.ponderation}" value="${val}" data-critere="${c.id_critere}" data-max="${c.ponderation}" class="eval-range" />
+                                        <span class="score-value">${val} / ${c.ponderation}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                    <div class="card" style="position:sticky;top:5rem;align-self:start;">
+                        <h3 style="font-size:1rem;margin-bottom:1rem;">Note finale</h3>
+                        <div style="text-align:center;padding:1rem;background:var(--gray-50);border-radius:8px;margin-bottom:1rem;">
+                            <span id="finalScore" style="font-size:2rem;font-weight:700;color:var(--primary);">0</span>
+                            <span style="color:var(--gray-500);"> / 20</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Commentaire global</label>
+                            <textarea id="evalComment" rows="4" placeholder="Points forts, axes d'amélioration...">${evaluation ? evaluation.commentaire_global || '' : ''}</textarea>
+                        </div>
+                        <button class="btn btn-primary" style="width:100%;" onclick="saveEvaluation()">Enregistrer l'évaluation</button>
+                    </div>
+                </div>
+            `;
+
+            document.querySelectorAll(".eval-range").forEach(r => {
+                r.addEventListener("input", () => {
+                    r.nextElementSibling.textContent = `${r.value} / ${r.dataset.max}`;
+                    updateFinalScore(criteres);
+                });
+            });
+            updateFinalScore(criteres);
+        }
+
+        function updateFinalScore(criteres) {
+            const totalPonderation = criteres.reduce((s, c) => s + parseFloat(c.ponderation), 0);
+            let totalObtenu = 0;
+            document.querySelectorAll(".eval-range").forEach(r => { totalObtenu += parseFloat(r.value); });
+            const score = totalPonderation > 0 ? ((totalObtenu / totalPonderation) * 20).toFixed(1) : 0;
+            document.getElementById("finalScore").textContent = score;
+        }
+
+        async function saveEvaluation() {
+            const ranges = [...document.querySelectorAll(".eval-range")];
+            const notes = ranges.map(r => ({
+                id_critere: parseInt(r.dataset.critere),
+                note: parseFloat(r.value)
+            }));
+            const totalPonderation = ranges.reduce((s, r) => s + parseFloat(r.dataset.max), 0);
+            const totalObtenu = notes.reduce((s, n) => s + n.note, 0);
+            const note_finale = totalPonderation > 0 ? parseFloat(((totalObtenu / totalPonderation) * 20).toFixed(2)) : 0;
+
+            const res = await fetch(`/api/encadrant/groups/${groupId}/evaluation`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({
+                    commentaire_global: document.getElementById("evalComment").value.trim(),
+                    note_finale,
+                    notes
+                })
+            });
+            const data = await res.json();
+            showToast(data.success ? "Évaluation enregistrée" : data.message, data.success ? "success" : "error");
+        }
+
+        // --- NOTES D'ENTREVUE ---
+        async function renderNotes() {
+            const res = await fetch(`/api/encadrant/notes?groupe=${groupId}`, { credentials: "include" });
+            const data = await res.json();
+
+            let html = `
+                <div class="card" style="margin-bottom:1rem;">
+                    <h3 style="font-size:0.95rem;margin-bottom:0.75rem;">Nouvelle note</h3>
+                    <div class="form-group" style="margin-bottom:0.5rem;">
+                        <input type="text" id="grpNoteTitle" placeholder="Titre (optionnel)" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--gray-200);border-radius:6px;font-size:0.85rem;" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <textarea id="grpNoteContent" rows="3" placeholder="Rédiger votre note..." style="width:100%;padding:0.75rem;border:1px solid var(--gray-200);border-radius:8px;font-size:0.875rem;resize:none;font-family:inherit;"></textarea>
+                    </div>
+                    <div style="text-align:right;">
+                        <button class="btn btn-primary btn-sm" id="grpPublishNote"><i class="fas fa-pen"></i> Publier</button>
+                    </div>
+                </div>
+            `;
+
+            if (!data.success || data.notes.length === 0) {
+                html += '<p style="color:var(--gray-500);text-align:center;">Aucune note pour ce groupe.</p>';
+            } else {
+                html += data.notes.map(n => `
+                    <div class="card" style="margin-bottom:0.75rem;position:relative;">
+                        <div style="position:absolute;top:0.75rem;right:0.75rem;display:flex;gap:0.25rem;">
+                            <button onclick="editGroupNote(${n.id_note}, '${escAttr(n.titre || '')}', '${escAttr(n.contenu)}')" style="background:none;border:none;color:var(--primary);cursor:pointer;padding:0.3rem;" title="Modifier"><i class="fas fa-pen"></i></button>
+                            <button onclick="deleteGroupNote(${n.id_note})" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0.3rem;" title="Supprimer"><i class="fas fa-trash"></i></button>
+                        </div>
+                        ${n.titre ? `<h4 style="font-size:0.9rem;font-weight:600;margin-bottom:0.3rem;">${esc(n.titre)}</h4>` : ''}
+                        <p style="font-size:0.85rem;color:var(--gray-700);white-space:pre-wrap;">${esc(n.contenu)}</p>
+                        <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--gray-400);">
+                            <i class="fas fa-calendar"></i> ${new Date(n.date_creation).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                    </div>
+                `).join("");
+            }
+
+            document.getElementById("tab-notes").innerHTML = html;
+
+            document.getElementById("grpPublishNote").addEventListener("click", async () => {
+                const titre = document.getElementById("grpNoteTitle").value.trim();
+                const contenu = document.getElementById("grpNoteContent").value.trim();
+                if (!contenu) { showToast("Contenu requis", "error"); return; }
+
+                const r = await fetch("/api/encadrant/notes", {
+                    method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+                    body: JSON.stringify({ titre, contenu, id_groupe: parseInt(groupId) })
+                });
+                const d = await r.json();
+                if (d.success) { showToast("Note publiée"); renderNotes(); }
+                else showToast(d.message, "error");
+            });
+        }
+
+        async function deleteGroupNote(id) {
+            confirmModal("Supprimer cette note ?", async () => {
+                const res = await fetch(`/api/encadrant/notes/${id}`, { method: "DELETE", credentials: "include" });
+                const data = await res.json();
+                if (data.success) { showToast("Note supprimée"); renderNotes(); }
+                else showToast(data.message, "error");
+            });
+        }
+
+        function editGroupNote(id, titre, contenu) {
+            const newTitre = prompt("Titre :", titre);
+            if (newTitre === null) return;
+            const newContenu = prompt("Contenu :", contenu);
+            if (newContenu === null || !newContenu.trim()) return;
+
+            fetch(`/api/encadrant/notes/${id}`, {
+                method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ titre: newTitre.trim(), contenu: newContenu.trim() })
+            }).then(r => r.json()).then(data => {
+                if (data.success) { showToast("Note modifiée"); renderNotes(); }
+                else showToast(data.message, "error");
+            });
+        }
+
+        function escAttr(str) { return (str || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n"); }
+
+        function esc(str) { const d = document.createElement("div"); d.textContent = str || ""; return d.innerHTML; }
+        function showToast(msg, type = "success") {
+            const t = document.getElementById("toast");
+            t.textContent = msg; t.className = `toast show ${type}`;
+            setTimeout(() => t.className = "toast", 3000);
+        }
+
+        load();
+    </script>
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Détail Projet</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        .group-card { border-left: 3px solid var(--secondary); position: relative; transition: border-color var(--transition); }
+        .group-card:hover { border-color: var(--gray-300); border-left-color: var(--secondary); }
+        .group-card.late { border-left-color: var(--danger); }
+        .student-checkbox { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem; border-radius: var(--radius-sm); cursor: pointer; }
+        .student-checkbox:hover { background: var(--gray-50); }
+        .promo-badge { font-size: 0.68rem; background: var(--gray-100); color: var(--gray-600); padding: 0.12rem 0.4rem; border-radius: var(--radius-sm); font-weight: 500; }
+        .header-actions { display: flex; gap: 0.4rem; }
+        .stat-card.clickable { cursor: pointer; transition: border-color var(--transition); }
+        .stat-card.clickable:hover { border-color: var(--gray-300); }
+        .sujets-panel { margin-top: 1.25rem; display: none; }
+        .sujets-panel.visible { display: block; }
+        .sujet-block { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.85rem; margin-bottom: 0.75rem; }
+        .sujet-block h4 { font-size: 0.85rem; margin-bottom: 0.4rem; }
+        .doc-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.6rem; background: var(--gray-50); border-radius: var(--radius-sm); margin-bottom: 0.3rem; font-size: 0.78rem; }
+        .doc-row a { color: var(--primary); text-decoration: none; font-weight: 500; }
+        .doc-row a:hover { text-decoration: underline; }
+        .doc-row .doc-actions { margin-left: auto; display: flex; gap: 0.15rem; }
+        .doc-row .doc-actions button { background: none; border: none; cursor: pointer; padding: 0.2rem 0.35rem; border-radius: var(--radius-sm); font-size: 0.72rem; }
+        .doc-row .doc-actions .preview-btn { color: var(--gray-400); }
+        .doc-row .doc-actions .preview-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+        .doc-row .doc-actions .delete-btn { color: var(--gray-400); }
+        .doc-row .doc-actions .delete-btn:hover { background: var(--danger-light); color: var(--danger); }
+        .file-upload-inline { border: 1px dashed var(--gray-300); border-radius: var(--radius); padding: 0.5rem; text-align: center; cursor: pointer; transition: border-color var(--transition); margin-top: 0.4rem; font-size: 0.75rem; color: var(--gray-500); }
+        .file-upload-inline:hover { border-color: var(--primary); color: var(--primary); }
+        .file-upload-inline input[type="file"] { display: none; }
+        .preview-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; align-items: center; justify-content: center; padding: 2rem; }
+        .preview-overlay.active { display: flex; }
+        .preview-box { background: #fff; border-radius: 8px; width: 90%; max-width: 900px; height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+        .preview-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--gray-200); }
+        .preview-header h3 { font-size: 0.9rem; font-weight: 600; }
+        .preview-header button { background: none; border: none; font-size: 1rem; cursor: pointer; color: var(--gray-400); }
+        .preview-header button:hover { color: var(--gray-700); }
+        .preview-body { flex: 1; overflow: auto; }
+        .preview-body iframe { width: 100%; height: 100%; border: none; }
+        .preview-body img { max-width: 100%; height: auto; display: block; margin: 1rem auto; }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb"><a href="/encadrant/projects.html">Projets</a> &rsaquo; <span id="breadcrumbName">...</span></div>
+                <h1 id="projectTitle">...</h1>
+            </div>
+            <div class="header-actions">
+                <a class="btn btn-secondary" id="editProjectBtn"><i class="fas fa-pen"></i> Modifier</a>
+                <button class="btn" style="background:var(--danger);color:#fff;" id="deleteProjectBtn"><i class="fas fa-trash"></i> Supprimer</button>
+                <button class="btn btn-primary" id="createGroupBtn"><i class="fas fa-plus"></i> Créer un groupe</button>
+            </div>
+        </header>
+        <main class="page-content">
+            <div id="projectMeta" style="display:flex;gap:1.5rem;margin-bottom:1.5rem;font-size:0.85rem;color:var(--gray-500);"></div>
+            <div class="stats-grid" id="projectStats"></div>
+            <!-- Panel Sujets & Documents -->
+            <div class="sujets-panel" id="sujetsPanel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                    <h3 style="font-size:1rem;">Sujets & Documents</h3>
+                    <button class="btn btn-secondary btn-sm" id="closeSujetsPanel"><i class="fas fa-times"></i> Fermer</button>
+                </div>
+                <div id="sujetsContent"></div>
+            </div>
+
+            <h3 style="font-size:1rem;margin-bottom:1rem;">Groupes</h3>
+            <div id="groupsGrid" class="grid-3"></div>
+        </main>
+    </div>
+
+    <!-- Modal créer groupe -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2>Créer un groupe</h2>
+            <form id="groupForm">
+                <div class="form-group">
+                    <label for="groupName">Nom du groupe</label>
+                    <input type="text" id="groupName" placeholder="Ex: Groupe 1" required />
+                </div>
+                <div class="form-group">
+                    <label>Étudiants</label>
+                    <div id="studentsList" style="max-height:250px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:0.5rem;"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelModal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Créer le groupe</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Preview fichier -->
+    <div class="preview-overlay" id="previewOverlay">
+        <div class="preview-box">
+            <div class="preview-header">
+                <h3 id="previewTitle">Document</h3>
+                <button id="closePreview"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="preview-body" id="previewBody"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("projects");
+
+        const params = new URLSearchParams(window.location.search);
+        const projectId = params.get("id");
+        if (!projectId) window.location.href = "/encadrant/projects.html";
+
+        async function load() {
+            await checkEncadrantAuth();
+            const res = await fetch(`/api/encadrant/projects/${projectId}`, { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) { window.location.href = "/encadrant/projects.html"; return; }
+
+            const p = data.project;
+            document.getElementById("breadcrumbName").textContent = p.nom;
+            document.getElementById("projectTitle").textContent = p.nom;
+            document.getElementById("editProjectBtn").href = `/encadrant/project-edit.html?id=${projectId}`;
+            document.getElementById("projectMeta").innerHTML = `
+                <span><i class="fas fa-calendar"></i> ${new Date(p.date_debut).toLocaleDateString('fr-FR')} - ${new Date(p.date_fin).toLocaleDateString('fr-FR')}</span>
+                ${p.promo ? `<span class="promo-badge">${esc(p.promo)}</span>` : ''}
+                <span class="badge badge-success"><span class="badge-dot"></span> ${p.etat}</span>
+            `;
+
+            document.getElementById("projectStats").innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+                    <div><div class="stat-label">Groupes</div><div class="stat-value">${data.groups.length}</div></div>
+                </div>
+                <div class="stat-card clickable" id="sujetsStatCard" title="Cliquez pour voir les sujets et documents">
+                    <div class="stat-icon primary"><i class="fas fa-book"></i></div>
+                    <div><div class="stat-label">Sujets</div><div class="stat-value">${data.sujets.length}</div></div>
+                </div>
+            `;
+
+            document.getElementById("sujetsStatCard").addEventListener("click", () => {
+                loadSujetsPanel(data.sujets);
+            });
+
+            if (data.groups.length === 0) {
+                document.getElementById("groupsGrid").innerHTML = '<p style="color:var(--gray-500);font-size:0.85rem;">Aucun groupe. Créez-en un.</p>';
+            } else {
+                document.getElementById("groupsGrid").innerHTML = data.groups.map(g => `
+                    <a href="/encadrant/group.html?id=${g.id_groupe}" class="card group-card" style="text-decoration:none;color:inherit;">
+                        <h4 style="font-size:0.95rem;margin-bottom:0.5rem;">${esc(g.nom)}</h4>
+                        <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:0.75rem;">${g.sujet_titre ? 'Sujet : ' + esc(g.sujet_titre) : 'Pas de sujet'}</p>
+                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--gray-500);">
+                            <span><i class="fas fa-users"></i> ${g.nb_membres} membres</span>
+                            <span class="badge badge-success"><span class="badge-dot"></span> ${g.etat}</span>
+                        </div>
+                    </a>
+                `).join("");
+            }
+        }
+
+        // Modal
+        const modal = document.getElementById("modalOverlay");
+        document.getElementById("createGroupBtn").addEventListener("click", async () => {
+            modal.classList.add("active");
+            const res = await fetch("/api/encadrant/students", { credentials: "include" });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById("studentsList").innerHTML = data.students.map(s => `
+                    <label class="student-checkbox">
+                        <input type="checkbox" value="${s.id_utilisateur}" />
+                        <span>${esc(s.prenom)} ${esc(s.nom)} <small style="color:var(--gray-400);">(${s.classe || ''})</small></span>
+                    </label>
+                `).join("");
+            }
+        });
+
+        document.getElementById("cancelModal").addEventListener("click", () => modal.classList.remove("active"));
+        modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("active"); });
+
+        document.getElementById("groupForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const nom = document.getElementById("groupName").value.trim();
+            const membres = [...document.querySelectorAll('#studentsList input:checked')].map(el => parseInt(el.value));
+
+            const res = await fetch(`/api/encadrant/projects/${projectId}/groups`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ nom, membres })
+            });
+            const data = await res.json();
+            if (data.success) {
+                modal.classList.remove("active");
+                showToast("Groupe créé");
+                load();
+            } else {
+                showToast(data.message, "error");
+            }
+        });
+
+        // --- PANEL SUJETS & DOCUMENTS ---
+        document.getElementById("closeSujetsPanel").addEventListener("click", () => {
+            document.getElementById("sujetsPanel").classList.remove("visible");
+        });
+
+        async function loadSujetsPanel(sujets) {
+            const panel = document.getElementById("sujetsPanel");
+            const content = document.getElementById("sujetsContent");
+            panel.classList.add("visible");
+
+            if (sujets.length === 0) {
+                content.innerHTML = '<p style="color:var(--gray-500);font-size:0.85rem;">Aucun sujet défini pour ce projet.</p>';
+                return;
+            }
+
+            content.innerHTML = '<p style="color:var(--gray-400);font-size:0.8rem;">Chargement...</p>';
+            let html = "";
+
+            for (const sujet of sujets) {
+                const docRes = await fetch(`/api/encadrant/sujets/${sujet.id_sujet}/documents`, { credentials: "include" });
+                const docData = await docRes.json();
+                const docs = docData.success ? docData.documents : [];
+
+                html += `
+                    <div class="sujet-block">
+                        <h4><i class="fas fa-bookmark" style="color:var(--primary);margin-right:0.5rem;"></i>${esc(sujet.titre)}</h4>
+                        ${sujet.description ? `<p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:0.75rem;">${esc(sujet.description)}</p>` : ''}
+                        <div class="docs-container" data-sujet="${sujet.id_sujet}">
+                            ${docs.length === 0 ? '<p style="font-size:0.8rem;color:var(--gray-400);margin-bottom:0.5rem;">Aucun document.</p>' :
+                            docs.map(d => `
+                                <div class="doc-row">
+                                    <i class="fas fa-file-alt" style="color:var(--primary);"></i>
+                                    <a href="/uploads/sujets/${d.chemin_fichier}" target="_blank">${esc(d.nom_fichier)}</a>
+                                    <div class="doc-actions">
+                                        <button class="preview-btn" onclick="previewFile('${d.chemin_fichier}', '${escAttr(d.nom_fichier)}')" title="Prévisualiser"><i class="fas fa-eye"></i></button>
+                                        <button class="delete-btn" onclick="deleteDoc(${d.id_document})" title="Supprimer"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </div>
+                            `).join("")}
+                        </div>
+                        <div class="file-upload-inline" onclick="this.querySelector('input').click()">
+                            <input type="file" class="sujet-upload" data-sujet="${sujet.id_sujet}" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.txt,.png,.jpg" />
+                            <i class="fas fa-cloud-upload-alt" style="color:var(--gray-400);margin-right:0.5rem;"></i>
+                            <span style="font-size:0.8rem;color:var(--gray-500);">Ajouter des fichiers</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = html;
+
+            // Upload handlers
+            content.querySelectorAll(".sujet-upload").forEach(input => {
+                input.addEventListener("change", async () => {
+                    if (input.files.length === 0) return;
+                    const sujetId = input.dataset.sujet;
+                    const formData = new FormData();
+                    [...input.files].forEach(f => formData.append("fichiers", f));
+                    const r = await fetch(`/api/encadrant/sujets/${sujetId}/documents`, {
+                        method: "POST", credentials: "include", body: formData
+                    });
+                    const d = await r.json();
+                    if (d.success) {
+                        showToast(d.message);
+                        // Recharger le panel
+                        const res = await fetch(`/api/encadrant/projects/${projectId}`, { credentials: "include" });
+                        const data = await res.json();
+                        if (data.success) loadSujetsPanel(data.sujets);
+                    } else {
+                        showToast(d.message, "error");
+                    }
+                });
+            });
+        }
+
+        function previewFile(chemin, nom) {
+            const ext = nom.split('.').pop().toLowerCase();
+            const url = `/uploads/sujets/${chemin}`;
+            const body = document.getElementById("previewBody");
+            document.getElementById("previewTitle").textContent = nom;
+
+            if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+                body.innerHTML = `<img src="${url}" alt="${escAttr(nom)}" />`;
+            } else if (ext === 'pdf') {
+                body.innerHTML = `<iframe src="${url}"></iframe>`;
+            } else {
+                body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:1rem;color:var(--gray-500);">
+                    <i class="fas fa-file-download" style="font-size:3rem;"></i>
+                    <p>Aperçu non disponible pour ce type de fichier.</p>
+                    <a href="${url}" target="_blank" class="btn btn-primary"><i class="fas fa-download"></i> Télécharger</a>
+                </div>`;
+            }
+
+            document.getElementById("previewOverlay").classList.add("active");
+        }
+
+        document.getElementById("closePreview").addEventListener("click", () => {
+            document.getElementById("previewOverlay").classList.remove("active");
+            document.getElementById("previewBody").innerHTML = "";
+        });
+        document.getElementById("previewOverlay").addEventListener("click", (e) => {
+            if (e.target === document.getElementById("previewOverlay")) {
+                document.getElementById("previewOverlay").classList.remove("active");
+                document.getElementById("previewBody").innerHTML = "";
+            }
+        });
+
+        function deleteDoc(docId) {
+            confirmModal("Supprimer ce document ?", async () => {
+                const r = await fetch(`/api/encadrant/documents/${docId}`, { method: "DELETE", credentials: "include" });
+                const d = await r.json();
+                if (d.success) {
+                    showToast("Document supprimé");
+                    const res = await fetch(`/api/encadrant/projects/${projectId}`, { credentials: "include" });
+                    const data = await res.json();
+                    if (data.success) loadSujetsPanel(data.sujets);
+                } else {
+                    showToast(d.message, "error");
+                }
+            });
+        }
+
+        function escAttr(str) { return (str || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n"); }
+
+        // Suppression projet
+        document.getElementById("deleteProjectBtn").addEventListener("click", () => {
+            confirmModal("Supprimer ce projet et tous ses groupes, sujets et documents ? Cette action est irréversible.", () => {
+                fetch(`/api/encadrant/projects/${projectId}`, { method: "DELETE", credentials: "include" })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.href = "/encadrant/projects.html";
+                        } else {
+                            showToast(data.message, "error");
+                        }
+                    });
+            });
+        });
+
+        function esc(str) { const d = document.createElement("div"); d.textContent = str || ""; return d.innerHTML; }
+        function showToast(msg, type = "success") {
+            const t = document.getElementById("toast");
+            t.textContent = msg; t.className = `toast show ${type}`;
+            setTimeout(() => t.className = "toast", 3000);
+        }
+
+        load();
+    </script>
+</body>
+</html>

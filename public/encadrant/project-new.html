@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Nouveau Projet</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        .subject-card { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.85rem; position: relative; }
+        .subject-card .remove-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none; color: var(--gray-400); cursor: pointer; font-size: 0.75rem; }
+        .subject-card .remove-btn:hover { color: var(--danger); }
+        .criteria-row { display: grid; grid-template-columns: 2fr 80px 3fr 32px; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; }
+        .criteria-row input { padding: 0.4rem 0.6rem; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 0.8rem; }
+        .criteria-row .remove-btn { background: none; border: none; color: var(--gray-400); cursor: pointer; }
+        .criteria-row .remove-btn:hover { color: var(--danger); }
+        .sticky-footer { position: sticky; bottom: 0; background: var(--white); border-top: 1px solid var(--gray-200); padding: 0.75rem 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
+        .file-upload-zone { border: 1px dashed var(--gray-300); border-radius: var(--radius); padding: 0.6rem; text-align: center; cursor: pointer; transition: border-color var(--transition); margin-top: 0.4rem; font-size: 0.75rem; color: var(--gray-500); }
+        .file-upload-zone:hover { border-color: var(--primary); color: var(--primary); }
+        .file-upload-zone input[type="file"] { display: none; }
+        .file-list { margin-top: 0.4rem; }
+        .file-item { display: flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.5rem; background: var(--gray-50); border-radius: var(--radius-sm); margin-bottom: 0.2rem; font-size: 0.75rem; }
+        .file-item .remove-file { background: none; border: none; color: var(--gray-400); cursor: pointer; font-size: 0.7rem; margin-left: auto; }
+        .file-item .remove-file:hover { color: var(--danger); }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb"><a href="/encadrant/projects.html">Projets</a> &rsaquo; Nouveau projet</div>
+                <h1>Nouveau projet</h1>
+            </div>
+        </header>
+        <main class="page-content" style="max-width:800px;">
+            <form id="projectForm">
+                <section class="card" style="margin-bottom:1.5rem;">
+                    <h3 style="font-size:1rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-100);">Informations générales</h3>
+                    <div class="form-group">
+                        <label for="nom">Nom du projet</label>
+                        <input type="text" id="nom" placeholder="Ex: Projet Annuel S8" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" rows="3" placeholder="Objectifs pédagogiques..."></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+                        <div class="form-group">
+                            <label for="promo">Promotion</label>
+                            <select id="promo">
+                                <option value="">-- Sélectionner --</option>
+                                <option value="ISEN 1">ISEN 1</option>
+                                <option value="ISEN 2">ISEN 2</option>
+                                <option value="ISEN 3">ISEN 3</option>
+                                <option value="ISEN 4">ISEN 4</option>
+                                <option value="ISEN 5">ISEN 5</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="date_debut">Date de début</label>
+                            <input type="date" id="date_debut" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="date_fin">Date de fin</label>
+                            <input type="date" id="date_fin" required />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card" style="margin-bottom:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-100);">
+                        <h3 style="font-size:1rem;">Sujets du projet</h3>
+                        <button type="button" class="btn btn-secondary btn-sm" id="addSubjectBtn"><i class="fas fa-plus"></i> Ajouter un sujet</button>
+                    </div>
+                    <div id="subjectsList"></div>
+                </section>
+
+                <section class="card" style="margin-bottom:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-100);">
+                        <h3 style="font-size:1rem;">Grille d'évaluation</h3>
+                        <button type="button" class="btn btn-secondary btn-sm" id="addCriteriaBtn"><i class="fas fa-plus"></i> Ajouter un critère</button>
+                    </div>
+                    <div id="criteriaList"></div>
+                    <div id="totalPoints" style="text-align:right;font-weight:700;margin-top:0.5rem;"></div>
+                </section>
+
+                <div class="sticky-footer">
+                    <a href="/encadrant/projects.html" class="btn btn-secondary">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Créer le projet</button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("projects");
+        checkEncadrantAuth();
+
+        let subjectCount = 0;
+        let criteriaCount = 0;
+
+        document.getElementById("addSubjectBtn").addEventListener("click", () => {
+            subjectCount++;
+            const div = document.createElement("div");
+            div.className = "subject-card";
+            div.style.marginBottom = "0.75rem";
+            div.dataset.files = "[]";
+            div.innerHTML = `
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label>Titre du sujet</label>
+                    <input type="text" class="subject-title" placeholder="Ex: Plateforme e-commerce" required />
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label>Description</label>
+                    <input type="text" class="subject-desc" placeholder="Brève description..." />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Documents associés</label>
+                    <div class="file-upload-zone" onclick="this.querySelector('input').click()">
+                        <input type="file" class="subject-files-input" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.txt,.png,.jpg" />
+                        <i class="fas fa-cloud-upload-alt" style="color:var(--gray-400);margin-right:0.5rem;"></i>
+                        <span style="font-size:0.8rem;color:var(--gray-500);">Cliquez pour ajouter des fichiers (PDF, Word, images...)</span>
+                    </div>
+                    <div class="file-list"></div>
+                </div>
+            `;
+            const fileInput = div.querySelector(".subject-files-input");
+            const fileList = div.querySelector(".file-list");
+
+            fileInput.addEventListener("change", () => {
+                const existing = JSON.parse(div.dataset.files || "[]");
+                const dt = new DataTransfer();
+                existing.forEach(idx => { if (fileInput.files[idx]) dt.items.add(fileInput.files[idx]); });
+                [...fileInput.files].forEach(f => dt.items.add(f));
+
+                const allFiles = [];
+                for (let i = 0; i < dt.files.length; i++) allFiles.push(dt.files[i]);
+
+                const store = new DataTransfer();
+                allFiles.forEach(f => store.items.add(f));
+                fileInput.files = store.files;
+
+                renderFileList(div);
+            });
+
+            document.getElementById("subjectsList").appendChild(div);
+        });
+
+        function renderFileList(card) {
+            const fileInput = card.querySelector(".subject-files-input");
+            const fileList = card.querySelector(".file-list");
+            fileList.innerHTML = "";
+            const files = [...fileInput.files];
+            files.forEach((f, i) => {
+                const item = document.createElement("div");
+                item.className = "file-item";
+                item.innerHTML = `
+                    <i class="fas fa-file"></i> ${esc(f.name)} <small style="color:var(--gray-400);">(${(f.size/1024).toFixed(0)} Ko)</small>
+                    <button type="button" class="remove-file" data-index="${i}" title="Retirer"><i class="fas fa-times"></i></button>
+                `;
+                item.querySelector(".remove-file").addEventListener("click", () => {
+                    removeFileAtIndex(card, i);
+                });
+                fileList.appendChild(item);
+            });
+        }
+
+        function removeFileAtIndex(card, index) {
+            const fileInput = card.querySelector(".subject-files-input");
+            const dt = new DataTransfer();
+            [...fileInput.files].forEach((f, i) => { if (i !== index) dt.items.add(f); });
+            fileInput.files = dt.files;
+            renderFileList(card);
+        }
+
+        document.getElementById("addCriteriaBtn").addEventListener("click", () => {
+            criteriaCount++;
+            const div = document.createElement("div");
+            div.className = "criteria-row";
+            div.innerHTML = `
+                <input type="text" class="criteria-name" placeholder="Nom du critère" required />
+                <input type="number" class="criteria-points" placeholder="Pts" min="1" required />
+                <input type="text" class="criteria-desc" placeholder="Description" />
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove();updateTotal()"><i class="fas fa-trash"></i></button>
+            `;
+            div.querySelector(".criteria-points").addEventListener("input", updateTotal);
+            document.getElementById("criteriaList").appendChild(div);
+            updateTotal();
+        });
+
+        function updateTotal() {
+            const pts = [...document.querySelectorAll(".criteria-points")].reduce((sum, el) => sum + (parseInt(el.value) || 0), 0);
+            document.getElementById("totalPoints").textContent = pts > 0 ? `Total : ${pts} points` : "";
+        }
+
+        document.getElementById("projectForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const sujets = [...document.querySelectorAll(".subject-card")].map(card => ({
+                titre: card.querySelector(".subject-title").value.trim(),
+                description: card.querySelector(".subject-desc").value.trim(),
+                files: card.querySelector(".subject-files-input").files
+            })).filter(s => s.titre);
+
+            const criteres = [...document.querySelectorAll(".criteria-row")].map(row => ({
+                nom: row.querySelector(".criteria-name").value.trim(),
+                ponderation: parseInt(row.querySelector(".criteria-points").value) || 0,
+                description: row.querySelector(".criteria-desc").value.trim()
+            })).filter(c => c.nom && c.ponderation > 0);
+
+            const body = {
+                nom: document.getElementById("nom").value.trim(),
+                description: document.getElementById("description").value.trim(),
+                date_debut: document.getElementById("date_debut").value,
+                date_fin: document.getElementById("date_fin").value,
+                promo: document.getElementById("promo").value,
+                sujets: sujets.map(s => ({ titre: s.titre, description: s.description })),
+                criteres
+            };
+
+            const res = await fetch("/api/encadrant/projects", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Upload fichiers pour chaque sujet
+                const projectId = data.projectId;
+                const sujetsRes = await fetch(`/api/encadrant/projects/${projectId}`, { credentials: "include" });
+                const sujetsData = await sujetsRes.json();
+
+                if (sujetsData.success && sujetsData.sujets.length > 0) {
+                    for (let i = 0; i < sujets.length; i++) {
+                        if (sujets[i].files && sujets[i].files.length > 0 && sujetsData.sujets[i]) {
+                            const formData = new FormData();
+                            [...sujets[i].files].forEach(f => formData.append("fichiers", f));
+                            await fetch(`/api/encadrant/sujets/${sujetsData.sujets[i].id_sujet}/documents`, {
+                                method: "POST",
+                                credentials: "include",
+                                body: formData
+                            });
+                        }
+                    }
+                }
+
+                window.location.href = `/encadrant/project.html?id=${projectId}`;
+            } else {
+                showToast(data.message, "error");
+            }
+        });
+
+        function esc(str) { const d = document.createElement("div"); d.textContent = str; return d.innerHTML; }
+        function showToast(msg, type = "success") {
+            const t = document.getElementById("toast");
+            t.textContent = msg;
+            t.className = `toast show ${type}`;
+            setTimeout(() => t.className = "toast", 3000);
+        }
+    </script>
+</body>
+</html>

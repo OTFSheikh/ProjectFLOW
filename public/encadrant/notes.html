@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Notes d'entrevue</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        .note-card { position: relative; }
+        .note-card .note-actions { position: absolute; top: 0.6rem; right: 0.6rem; display: flex; gap: 0.15rem; opacity: 0; transition: opacity var(--transition); }
+        .note-card:hover .note-actions { opacity: 1; }
+        .note-card .note-actions button { background: none; border: none; cursor: pointer; padding: 0.25rem 0.35rem; border-radius: var(--radius-sm); font-size: 0.75rem; }
+        .note-card .note-actions .edit-note { color: var(--gray-400); }
+        .note-card .note-actions .edit-note:hover { background: var(--gray-100); color: var(--gray-700); }
+        .note-card .note-actions .delete-note { color: var(--gray-400); }
+        .note-card .note-actions .delete-note:hover { background: var(--danger-light); color: var(--danger); }
+        .filter-btn { text-align: left; width: 100%; }
+        .filter-btn.active { background: var(--gray-900); color: #fff; }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Accueil &rsaquo; Notes d'entrevue</div>
+                <h1>Notes d'entrevue</h1>
+            </div>
+        </header>
+        <main class="page-content" style="display:flex;gap:1.5rem;">
+            <!-- Filtres -->
+            <aside style="width:240px;flex-shrink:0;">
+                <div class="card" style="margin-bottom:1rem;">
+                    <h3 style="font-size:0.95rem;margin-bottom:1rem;"><i class="fas fa-folder" style="margin-right:0.5rem;"></i>Filtrer par projet</h3>
+                    <div id="projectFilters" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+                </div>
+                <div class="card" id="groupFilterCard" style="display:none;">
+                    <h3 style="font-size:0.95rem;margin-bottom:1rem;"><i class="fas fa-users" style="margin-right:0.5rem;"></i>Groupes du projet</h3>
+                    <div id="groupFilters" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+                </div>
+            </aside>
+            <!-- Feed -->
+            <div style="flex:1;">
+                <!-- Formulaire nouvelle note -->
+                <div class="card" style="margin-bottom:1.5rem;">
+                    <h3 style="font-size:0.95rem;margin-bottom:0.75rem;">Nouvelle note</h3>
+                    <div class="form-group" style="margin-bottom:0.5rem;">
+                        <input type="text" id="noteTitle" placeholder="Titre de la note (optionnel)" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--gray-200);border-radius:6px;font-size:0.85rem;" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <textarea id="noteContent" rows="3" placeholder="Rédiger votre note..." style="width:100%;padding:0.75rem;border:1px solid var(--gray-200);border-radius:8px;font-size:0.875rem;resize:none;font-family:inherit;"></textarea>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <select id="noteGroup" style="padding:0.5rem;border:1px solid var(--gray-200);border-radius:6px;font-size:0.85rem;">
+                            <option value="">Sélectionner un groupe</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm" id="publishNote"><i class="fas fa-pen"></i> Publier</button>
+                    </div>
+                </div>
+                <!-- Liste des notes -->
+                <div id="notesFeed"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal édition -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal" style="max-width:500px;">
+            <h2>Modifier la note</h2>
+            <form id="editNoteForm">
+                <div class="form-group">
+                    <label for="editTitle">Titre</label>
+                    <input type="text" id="editTitle" placeholder="Titre (optionnel)" />
+                </div>
+                <div class="form-group">
+                    <label for="editContent">Contenu</label>
+                    <textarea id="editContent" rows="5" required></textarea>
+                </div>
+                <input type="hidden" id="editNoteId" />
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelEdit">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("notes");
+
+        let projects = [];
+        let projectGroups = {};
+        let selectedProject = null;
+        let selectedGroup = null;
+
+        async function load() {
+            await checkEncadrantAuth();
+
+            const pRes = await fetch("/api/encadrant/projects", { credentials: "include" });
+            const pData = await pRes.json();
+            if (!pData.success) return;
+            projects = pData.projects;
+
+            // Charger les groupes de chaque projet
+            for (const p of projects) {
+                const gRes = await fetch(`/api/encadrant/projects/${p.id_projet}`, { credentials: "include" });
+                const gData = await gRes.json();
+                if (gData.success) {
+                    projectGroups[p.id_projet] = gData.groups;
+                }
+            }
+
+            renderProjectFilters();
+            loadNotes();
+        }
+
+        function renderProjectFilters() {
+            const container = document.getElementById("projectFilters");
+            container.innerHTML = `<button class="btn btn-sm filter-btn ${!selectedProject ? 'active' : 'btn-secondary'}" onclick="selectProject(null)">Tous les projets</button>` +
+                projects.map(p => `<button class="btn btn-sm filter-btn ${selectedProject === p.id_projet ? 'active' : 'btn-secondary'}" onclick="selectProject(${p.id_projet})">${esc(p.nom)}</button>`).join("");
+        }
+
+        function selectProject(projectId) {
+            selectedProject = projectId;
+            selectedGroup = null;
+            renderProjectFilters();
+            renderGroupFilters();
+            updateGroupSelect();
+            loadNotes();
+        }
+
+        function renderGroupFilters() {
+            const card = document.getElementById("groupFilterCard");
+            const container = document.getElementById("groupFilters");
+
+            if (!selectedProject) {
+                card.style.display = "none";
+                return;
+            }
+
+            card.style.display = "block";
+            const groups = projectGroups[selectedProject] || [];
+            container.innerHTML = `<button class="btn btn-sm filter-btn ${!selectedGroup ? 'active' : 'btn-secondary'}" onclick="selectGroup(null)">Tous les groupes</button>` +
+                groups.map(g => `<button class="btn btn-sm filter-btn ${selectedGroup === g.id_groupe ? 'active' : 'btn-secondary'}" onclick="selectGroup(${g.id_groupe})">${esc(g.nom)}</button>`).join("");
+        }
+
+        function selectGroup(groupId) {
+            selectedGroup = groupId;
+            renderGroupFilters();
+            loadNotes();
+        }
+
+        function updateGroupSelect() {
+            const select = document.getElementById("noteGroup");
+            select.innerHTML = '<option value="">Sélectionner un groupe</option>';
+
+            if (selectedProject) {
+                const groups = projectGroups[selectedProject] || [];
+                groups.forEach(g => {
+                    const opt = document.createElement("option");
+                    opt.value = g.id_groupe;
+                    opt.textContent = g.nom;
+                    select.appendChild(opt);
+                });
+            } else {
+                projects.forEach(p => {
+                    const groups = projectGroups[p.id_projet] || [];
+                    groups.forEach(g => {
+                        const opt = document.createElement("option");
+                        opt.value = g.id_groupe;
+                        opt.textContent = `${g.nom} (${p.nom})`;
+                        select.appendChild(opt);
+                    });
+                });
+            }
+        }
+
+        async function loadNotes() {
+            let url = "/api/encadrant/notes";
+            const params = [];
+            if (selectedProject) params.push(`projet=${selectedProject}`);
+            if (selectedGroup) params.push(`groupe=${selectedGroup}`);
+            if (params.length > 0) url += "?" + params.join("&");
+
+            const res = await fetch(url, { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) return;
+
+            if (data.notes.length === 0) {
+                document.getElementById("notesFeed").innerHTML = '<p style="color:var(--gray-500);text-align:center;padding:2rem;">Aucune note pour le moment.</p>';
+                return;
+            }
+
+            document.getElementById("notesFeed").innerHTML = data.notes.map(n => `
+                <div class="card note-card" style="margin-bottom:0.75rem;">
+                    <div class="note-actions">
+                        <button class="edit-note" onclick="openEditModal(${n.id_note}, '${escAttr(n.titre || '')}', '${escAttr(n.contenu)}')" title="Modifier"><i class="fas fa-pen"></i></button>
+                        <button class="delete-note" onclick="deleteNote(${n.id_note})" title="Supprimer"><i class="fas fa-trash"></i></button>
+                    </div>
+                    ${n.titre ? `<h4 style="font-size:0.95rem;font-weight:600;margin-bottom:0.4rem;">${esc(n.titre)}</h4>` : ''}
+                    <p style="font-size:0.85rem;color:var(--gray-700);margin-bottom:0.75rem;white-space:pre-wrap;">${esc(n.contenu)}</p>
+                    <div style="display:flex;align-items:center;gap:1rem;font-size:0.75rem;color:var(--gray-400);">
+                        <span class="badge badge-success" style="font-size:0.7rem;">${esc(n.groupe_nom)}</span>
+                        <span>${esc(n.projet_nom)}</span>
+                        <span><i class="fas fa-calendar"></i> ${new Date(n.date_creation).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        // Publication
+        document.getElementById("publishNote").addEventListener("click", async () => {
+            const titre = document.getElementById("noteTitle").value.trim();
+            const contenu = document.getElementById("noteContent").value.trim();
+            const id_groupe = document.getElementById("noteGroup").value;
+            if (!contenu || !id_groupe) { showToast("Contenu et groupe requis", "error"); return; }
+
+            const res = await fetch("/api/encadrant/notes", {
+                method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ titre, contenu, id_groupe: parseInt(id_groupe) })
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById("noteTitle").value = "";
+                document.getElementById("noteContent").value = "";
+                showToast("Note publiée");
+                loadNotes();
+            } else { showToast(data.message, "error"); }
+        });
+
+        // Suppression
+        function deleteNote(id) {
+            confirmModal("Supprimer cette note ?", async () => {
+                const res = await fetch(`/api/encadrant/notes/${id}`, { method: "DELETE", credentials: "include" });
+                const data = await res.json();
+                if (data.success) { showToast("Note supprimée"); loadNotes(); }
+                else showToast(data.message, "error");
+            });
+        }
+
+        // Modification (modal)
+        function openEditModal(id, titre, contenu) {
+            document.getElementById("editNoteId").value = id;
+            document.getElementById("editTitle").value = titre;
+            document.getElementById("editContent").value = contenu;
+            document.getElementById("editModal").classList.add("active");
+        }
+
+        document.getElementById("cancelEdit").addEventListener("click", () => {
+            document.getElementById("editModal").classList.remove("active");
+        });
+        document.getElementById("editModal").addEventListener("click", (e) => {
+            if (e.target === document.getElementById("editModal")) document.getElementById("editModal").classList.remove("active");
+        });
+
+        document.getElementById("editNoteForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const id = document.getElementById("editNoteId").value;
+            const titre = document.getElementById("editTitle").value.trim();
+            const contenu = document.getElementById("editContent").value.trim();
+            if (!contenu) { showToast("Contenu requis", "error"); return; }
+
+            const res = await fetch(`/api/encadrant/notes/${id}`, {
+                method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ titre, contenu })
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById("editModal").classList.remove("active");
+                showToast("Note modifiée");
+                loadNotes();
+            } else { showToast(data.message, "error"); }
+        });
+
+        function esc(str) { const d = document.createElement("div"); d.textContent = str || ""; return d.innerHTML; }
+        function escAttr(str) { return (str || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n"); }
+        function showToast(msg, type = "success") {
+            const t = document.getElementById("toast");
+            t.textContent = msg; t.className = `toast show ${type}`;
+            setTimeout(() => t.className = "toast", 3000);
+        }
+
+        updateGroupSelect();
+        load();
+    </script>
+</body>
+</html>

@@ -31,6 +31,7 @@ CREATE TABLE Projet (
   date_debut DATE NOT NULL,
   date_fin DATE NOT NULL,
   etat VARCHAR(50) NOT NULL DEFAULT 'Ouvert',
+  promo VARCHAR(50) NULL,
   id_utilisateur INT NOT NULL,
   PRIMARY KEY (id_projet)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -212,6 +213,22 @@ ALTER TABLE Note_sur ADD CONSTRAINT fk_note_evaluation FOREIGN KEY (id_evaluatio
 ALTER TABLE Note_sur ADD CONSTRAINT fk_note_critere FOREIGN KEY (id_critere) REFERENCES Critere_evaluation (id_critere) ON DELETE CASCADE;
 
 -- ============================================================
+-- Notes d'entrevue (encadrant)
+-- ============================================================
+
+CREATE TABLE Note_entrevue (
+  id_note INT AUTO_INCREMENT NOT NULL,
+  titre VARCHAR(150) NULL,
+  contenu TEXT NOT NULL,
+  date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
+  id_utilisateur INT NOT NULL,
+  id_groupe INT NOT NULL,
+  PRIMARY KEY (id_note),
+  FOREIGN KEY (id_utilisateur) REFERENCES Utilisateur(id_utilisateur),
+  FOREIGN KEY (id_groupe) REFERENCES Groupe(id_groupe) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
 -- Colonnes pour l'activation de compte
 -- ============================================================
 
@@ -232,3 +249,11 @@ INSERT INTO Utilisateur (
   NOW(), TRUE,
   FALSE, FALSE, TRUE
 );
+
+-- ============================================================
+-- Migration : ajout colonne promo à Projet
+-- (exécuter sur une base existante)
+-- ============================================================
+
+-- ALTER TABLE Projet ADD COLUMN promo VARCHAR(50) NULL AFTER etat;
+-- ALTER TABLE Note_entrevue ADD COLUMN titre VARCHAR(150) NULL AFTER id_note;

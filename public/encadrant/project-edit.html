@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Modifier Projet</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        .sticky-footer { position: sticky; bottom: 0; background: var(--white); border-top: 1px solid var(--gray-200); padding: 0.75rem 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
+        .doc-item { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.6rem; background: var(--gray-50); border-radius: var(--radius-sm); margin-bottom: 0.2rem; font-size: 0.75rem; }
+        .doc-item .remove-doc { background: none; border: none; color: var(--gray-400); cursor: pointer; margin-left: auto; font-size: 0.7rem; }
+        .doc-item .remove-doc:hover { color: var(--danger); }
+        .sujet-section { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.85rem; margin-bottom: 0.6rem; }
+        .file-upload-zone { border: 1px dashed var(--gray-300); border-radius: var(--radius); padding: 0.6rem; text-align: center; cursor: pointer; transition: border-color var(--transition); margin-top: 0.4rem; font-size: 0.75rem; color: var(--gray-500); }
+        .file-upload-zone:hover { border-color: var(--primary); color: var(--primary); }
+        .file-upload-zone input[type="file"] { display: none; }
+        .criteria-row { display: grid; grid-template-columns: 2fr 80px 3fr 32px; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; }
+        .criteria-row input { padding: 0.4rem 0.6rem; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 0.8rem; }
+        .criteria-row .remove-btn { background: none; border: none; color: var(--gray-400); cursor: pointer; }
+        .criteria-row .remove-btn:hover { color: var(--danger); }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb"><a href="/encadrant/projects.html">Projets</a> &rsaquo; <span id="breadcrumbName">Modifier</span></div>
+                <h1>Modifier le projet</h1>
+            </div>
+        </header>
+        <main class="page-content" style="max-width:800px;">
+            <form id="editForm">
+                <section class="card" style="margin-bottom:1.5rem;">
+                    <h3 style="font-size:1rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-100);">Informations générales</h3>
+                    <div class="form-group">
+                        <label for="nom">Nom du projet</label>
+                        <input type="text" id="nom" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" rows="3"></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;">
+                        <div class="form-group">
+                            <label for="promo">Promotion</label>
+                            <select id="promo">
+                                <option value="">-- Sélectionner --</option>
+                                <option value="ISEN 1">ISEN 1</option>
+                                <option value="ISEN 2">ISEN 2</option>
+                                <option value="ISEN 3">ISEN 3</option>
+                                <option value="ISEN 4">ISEN 4</option>
+                                <option value="ISEN 5">ISEN 5</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="etat">État</label>
+                            <select id="etat">
+                                <option value="Ouvert">Ouvert</option>
+                                <option value="En_cours">En cours</option>
+                                <option value="Termine">Terminé</option>
+                                <option value="Annule">Annulé</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="date_debut">Date de début</label>
+                            <input type="date" id="date_debut" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="date_fin">Date de fin</label>
+                            <input type="date" id="date_fin" required />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card" style="margin-bottom:1.5rem;">
+                    <h3 style="font-size:1rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-100);">Sujets & Documents</h3>
+                    <div id="sujetsList"></div>
+                </section>
+
+                <section class="card" style="margin-bottom:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-100);">
+                        <h3 style="font-size:1rem;">Grille d'évaluation</h3>
+                        <button type="button" class="btn btn-secondary btn-sm" id="addCriteriaBtn"><i class="fas fa-plus"></i> Ajouter un critère</button>
+                    </div>
+                    <div id="criteriaList"></div>
+                    <div id="totalPoints" style="text-align:right;font-weight:700;margin-top:0.5rem;"></div>
+                </section>
+
+                <div class="sticky-footer">
+                    <a href="#" id="cancelBtn" class="btn btn-secondary">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("projects");
+
+        const params = new URLSearchParams(window.location.search);
+        const projectId = params.get("id");
+        if (!projectId) window.location.href = "/encadrant/projects.html";
+
+        document.getElementById("cancelBtn").href = `/encadrant/project.html?id=${projectId}`;
+
+        async function load() {
+            await checkEncadrantAuth();
+            const res = await fetch(`/api/encadrant/projects/${projectId}`, { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) { window.location.href = "/encadrant/projects.html"; return; }
+
+            const p = data.project;
+            document.getElementById("breadcrumbName").textContent = p.nom;
+            document.getElementById("nom").value = p.nom;
+            document.getElementById("description").value = p.description || "";
+            document.getElementById("promo").value = p.promo || "";
+            document.getElementById("etat").value = p.etat || "Ouvert";
+            document.getElementById("date_debut").value = p.date_debut ? p.date_debut.split("T")[0] : "";
+            document.getElementById("date_fin").value = p.date_fin ? p.date_fin.split("T")[0] : "";
+
+            // Critères existants
+            const criteriaList = document.getElementById("criteriaList");
+            criteriaList.innerHTML = "";
+            if (data.criteres && data.criteres.length > 0) {
+                data.criteres.forEach(c => addCriteriaRow(c.nom, c.ponderation, c.description));
+            }
+            updateTotal();
+
+            // Sujets avec documents
+            const sujetsList = document.getElementById("sujetsList");
+            if (data.sujets.length === 0) {
+                sujetsList.innerHTML = '<p style="color:var(--gray-500);font-size:0.85rem;">Aucun sujet défini.</p>';
+            } else {
+                sujetsList.innerHTML = "";
+                for (const sujet of data.sujets) {
+                    const docRes = await fetch(`/api/encadrant/sujets/${sujet.id_sujet}/documents`, { credentials: "include" });
+                    const docData = await docRes.json();
+                    const docs = docData.success ? docData.documents : [];
+
+                    const section = document.createElement("div");
+                    section.className = "sujet-section";
+                    section.innerHTML = `
+                        <h4 style="font-size:0.9rem;font-weight:600;margin-bottom:0.5rem;">${esc(sujet.titre)}</h4>
+                        <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:0.75rem;">${esc(sujet.description || '')}</p>
+                        <div class="docs-list">
+                            ${docs.map(d => `
+                                <div class="doc-item">
+                                    <i class="fas fa-file"></i>
+                                    <a href="/uploads/sujets/${d.chemin_fichier}" target="_blank" style="color:var(--primary);text-decoration:none;">${esc(d.nom_fichier)}</a>
+                                    <button type="button" class="remove-doc" data-id="${d.id_document}" title="Supprimer"><i class="fas fa-trash"></i></button>
+                                </div>
+                            `).join("")}
+                        </div>
+                        <div class="file-upload-zone" onclick="this.querySelector('input').click()">
+                            <input type="file" class="upload-input" data-sujet="${sujet.id_sujet}" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip,.rar,.txt,.png,.jpg" />
+                            <i class="fas fa-cloud-upload-alt" style="color:var(--gray-400);margin-right:0.5rem;"></i>
+                            <span style="font-size:0.8rem;color:var(--gray-500);">Ajouter des fichiers</span>
+                        </div>
+                    `;
+                    sujetsList.appendChild(section);
+                }
+
+                // Upload handlers
+                sujetsList.querySelectorAll(".upload-input").forEach(input => {
+                    input.addEventListener("change", async () => {
+                        if (input.files.length === 0) return;
+                        const sujetId = input.dataset.sujet;
+                        const formData = new FormData();
+                        [...input.files].forEach(f => formData.append("fichiers", f));
+                        const r = await fetch(`/api/encadrant/sujets/${sujetId}/documents`, {
+                            method: "POST", credentials: "include", body: formData
+                        });
+                        const d = await r.json();
+                        if (d.success) { showToast(d.message); load(); }
+                        else showToast(d.message, "error");
+                    });
+                });
+
+                // Delete doc handlers
+                sujetsList.querySelectorAll(".remove-doc").forEach(btn => {
+                    btn.addEventListener("click", async () => {
+                        const docId = btn.dataset.id;
+                        const r = await fetch(`/api/encadrant/documents/${docId}`, {
+                            method: "DELETE", credentials: "include"
+                        });
+                        const d = await r.json();
+                        if (d.success) { showToast("Document supprimé"); load(); }
+                        else showToast(d.message, "error");
+                    });
+                });
+            }
+        }
+
+        // --- Grille de critères ---
+        function addCriteriaRow(nom = "", ponderation = "", description = "") {
+            const div = document.createElement("div");
+            div.className = "criteria-row";
+            div.innerHTML = `
+                <input type="text" class="criteria-name" placeholder="Nom du critère" value="${esc(nom)}" required />
+                <input type="number" class="criteria-points" placeholder="Pts" min="1" value="${ponderation}" required />
+                <input type="text" class="criteria-desc" placeholder="Description" value="${esc(description)}" />
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove();updateTotal()"><i class="fas fa-trash"></i></button>
+            `;
+            div.querySelector(".criteria-points").addEventListener("input", updateTotal);
+            document.getElementById("criteriaList").appendChild(div);
+        }
+
+        document.getElementById("addCriteriaBtn").addEventListener("click", () => {
+            addCriteriaRow();
+            updateTotal();
+        });
+
+        function updateTotal() {
+            const pts = [...document.querySelectorAll(".criteria-points")].reduce((sum, el) => sum + (parseInt(el.value) || 0), 0);
+            document.getElementById("totalPoints").textContent = pts > 0 ? `Total : ${pts} points` : "";
+        }
+
+        // --- Soumission ---
+        document.getElementById("editForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const body = {
+                nom: document.getElementById("nom").value.trim(),
+                description: document.getElementById("description").value.trim(),
+                promo: document.getElementById("promo").value,
+                etat: document.getElementById("etat").value,
+                date_debut: document.getElementById("date_debut").value,
+                date_fin: document.getElementById("date_fin").value
+            };
+
+            // Sauver infos générales
+            const res = await fetch(`/api/encadrant/projects/${projectId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                showToast(data.message, "error");
+                return;
+            }
+
+            // Sauver critères
+            const criteres = [...document.querySelectorAll(".criteria-row")].map(row => ({
+                nom: row.querySelector(".criteria-name").value.trim(),
+                ponderation: parseFloat(row.querySelector(".criteria-points").value) || 0,
+                description: row.querySelector(".criteria-desc").value.trim()
+            })).filter(c => c.nom && c.ponderation > 0);
+
+            const critRes = await fetch(`/api/encadrant/projects/${projectId}/criteres`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ criteres })
+            });
+            const critData = await critRes.json();
+
+            if (critData.success) {
+                showToast("Projet mis à jour");
+                setTimeout(() => window.location.href = `/encadrant/project.html?id=${projectId}`, 1000);
+            } else {
+                showToast(critData.message, "error");
+            }
+        });
+
+        function esc(str) { const d = document.createElement("div"); d.textContent = str || ""; return d.innerHTML; }
+        function showToast(msg, type = "success") {
+            const t = document.getElementById("toast");
+            t.textContent = msg; t.className = `toast show ${type}`;
+            setTimeout(() => t.className = "toast", 3000);
+        }
+
+        load();
+    </script>
+</body>
+</html>

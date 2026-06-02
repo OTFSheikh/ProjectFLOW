@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Tableau de bord</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        .projects-list { display: flex; flex-direction: column; }
+        .project-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--gray-100);
+            text-decoration: none;
+            color: inherit;
+            transition: background var(--transition);
+        }
+        .project-row:last-child { border-bottom: none; }
+        .project-row:hover { background: var(--gray-50); margin: 0 -1.25rem; padding-left: 1.25rem; padding-right: 1.25rem; }
+        .project-row .name { font-weight: 500; font-size: 0.82rem; flex: 1; }
+        .project-row .meta { font-size: 0.72rem; color: var(--gray-400); display: flex; gap: 0.75rem; align-items: center; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .section-header h3 { font-size: 0.72rem; text-transform: uppercase; font-weight: 500; color: var(--gray-500); letter-spacing: 0.3px; }
+        .section-header a { font-size: 0.75rem; color: var(--primary); text-decoration: none; font-weight: 500; }
+        .section-header a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Tableau de bord</div>
+                <h1>Tableau de bord</h1>
+            </div>
+            <div class="topbar-right">
+                <span id="userName"></span>
+            </div>
+        </header>
+        <main class="page-content">
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="card">
+                <div class="section-header">
+                    <h3>Projets actifs</h3>
+                    <a href="/encadrant/projects.html">Voir tout</a>
+                </div>
+                <div class="projects-list" id="projectsList"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("dashboard");
+
+        async function loadDashboard() {
+            const user = await checkEncadrantAuth();
+            if (!user) return;
+            document.getElementById("userName").textContent = `${user.prenom} ${user.nom}`;
+
+            const res = await fetch("/api/encadrant/dashboard", { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) return;
+
+            const s = data.stats;
+            document.getElementById("statsGrid").innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label">Projets actifs</div>
+                    <div class="stat-value">${s.projets_actifs}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Groupes</div>
+                    <div class="stat-value">${s.groupes_total}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Tâches en cours</div>
+                    <div class="stat-value">${s.taches_en_cours}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Livrables en attente</div>
+                    <div class="stat-value">${s.livrables_attente}</div>
+                </div>
+            `;
+
+            const res2 = await fetch("/api/encadrant/projects", { credentials: "include" });
+            const data2 = await res2.json();
+            const list = document.getElementById("projectsList");
+
+            if (data2.success && data2.projects.length > 0) {
+                list.innerHTML = data2.projects.slice(0, 6).map(p => `
+                    <a href="/encadrant/project.html?id=${p.id_projet}" class="project-row">
+                        <span class="name">${esc(p.nom)}</span>
+                        <span class="badge badge-success"><span class="badge-dot"></span> ${p.etat}</span>
+                        <span class="meta">
+                            <span>${p.nb_groupes} gr.</span>
+                            <span>${new Date(p.date_fin).toLocaleDateString('fr-FR')}</span>
+                        </span>
+                    </a>
+                `).join("");
+            } else {
+                list.innerHTML = '<p style="color:var(--gray-400);font-size:0.82rem;padding:1rem 0;">Aucun projet. <a href="/encadrant/project-new.html" style="color:var(--primary);">Créer un projet</a></p>';
+            }
+        }
+
+        function esc(str) {
+            const d = document.createElement("div");
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>

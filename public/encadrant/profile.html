@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Mon Profil</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+</head>
+<body>
+    <nav id="sidebar"></nav>
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Paramètres &rsaquo; Profil</div>
+                <h1>Mon Profil</h1>
+            </div>
+        </header>
+        <main class="page-content" style="max-width:600px;">
+            <!-- Profile card -->
+            <div class="card" style="text-align:center;margin-bottom:2rem;">
+                <div style="width:96px;height:96px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:2rem;color:var(--primary);font-weight:700;" id="avatarInitials">...</div>
+                <h2 id="profileName" style="font-size:1.25rem;">...</h2>
+                <p id="profileEmail" style="color:var(--gray-500);font-size:0.9rem;margin-top:0.25rem;">...</p>
+                <span id="profileMatiere" class="badge badge-info" style="margin-top:0.75rem;display:inline-block;"></span>
+            </div>
+
+            <!-- Edit profile -->
+            <div class="card" style="margin-bottom:2rem;">
+                <h3 style="font-size:1rem;margin-bottom:1.25rem;">Modifier le profil</h3>
+                <form id="profileForm">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div class="form-group"><label>Nom</label><input type="text" id="pNom" required /></div>
+                        <div class="form-group"><label>Prénom</label><input type="text" id="pPrenom" required /></div>
+                    </div>
+                    <div class="form-group"><label>Email</label><input type="email" id="pEmail" required /></div>
+                    <div class="form-group"><label>Matière</label><input type="text" id="pMatiere" placeholder="Ex: Génie Logiciel" /></div>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </form>
+            </div>
+
+            <!-- Change password -->
+            <div class="card">
+                <h3 style="font-size:1rem;margin-bottom:1.25rem;">Changer le mot de passe</h3>
+                <form id="passwordForm">
+                    <div class="form-group"><label>Mot de passe actuel</label><input type="password" id="pwCurrent" required /></div>
+                    <div class="form-group"><label>Nouveau mot de passe</label><input type="password" id="pwNew" required minlength="6" /></div>
+                    <div class="form-group"><label>Confirmer</label><input type="password" id="pwConfirm" required minlength="6" /></div>
+                    <button type="submit" class="btn btn-primary">Mettre à jour</button>
+                </form>
+            </div>
+        </main>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("profile");
+
+        async function load() {
+            await checkEncadrantAuth();
+            const res = await fetch("/api/encadrant/profile", { credentials: "include" });
+            const data = await res.json();
+            if (!data.success) return;
+
+            const p = data.profile;
+            document.getElementById("avatarInitials").textContent = (p.prenom[0] + p.nom[0]).toUpperCase();
+            document.getElementById("profileName").textContent = `${p.prenom} ${p.nom}`;
+            document.getElementById("profileEmail").textContent = p.email;
+            document.getElementById("profileMatiere").textContent = `Matière : ${p.matiere || 'Non renseignée'}`;
+
+            document.getElementById("pNom").value = p.nom;
+            document.getElementById("pPrenom").value = p.prenom;
+            document.getElementById("pEmail").value = p.email;
+            document.getElementById("pMatiere").value = p.matiere || "";
+        }
+
+        document.getElementById("profileForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const res = await fetch("/api/encadrant/profile", {
+                method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({
+                    nom: document.getElementById("pNom").value.trim(),
+                    prenom: document.getElementById("pPrenom").value.trim(),
+                    email: document.getElementById("pEmail").value.trim(),
+                    matiere: document.getElementById("pMatiere").value.trim()
+                })
+            });
+            const data = await res.json();
+            showToast(data.success ? "Profil mis à jour" : data.message, data.success ? "success" : "error");
+            if (data.success) load();
+        });
+
+        document.getElementById("passwordForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const nouveau = document.getElementById("pwNew").value;
+            if (nouveau !== document.getElementById("pwConfirm").value) {
+                showToast("Les mots de passe ne correspondent pas", "error"); return;
+            }
+            const res = await fetch("/api/encadrant/profile/password", {
+                method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ current: document.getElementById("pwCurrent").value, nouveau })
+            });
+            const data = await res.json();
+            showToast(data.success ? "Mot de passe changé" : data.message, data.success ? "success" : "error");
+            if (data.success) document.getElementById("passwordForm").reset();
+        });
+
+        function showToast(msg, type = "success") {
+            const t = document.getElementById("toast");
+            t.textContent = msg; t.className = `toast show ${type}`;
+            setTimeout(() => t.className = "toast", 3000);
+        }
+
+        load();
+    </script>
+</body>
+</html>

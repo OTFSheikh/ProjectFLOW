@@ -8,6 +8,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { hashPassword, comparePassword } = require("./utils/password");
 const adminRoutes = require("./routes/admin");
+const encadrantRoutes = require("./routes/encadrant");
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(session({
 }));
 
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /*
 ----------------------------------
@@ -66,7 +68,7 @@ app.post("/api/auth/login", (req, res) => {
     db.query(
         "SELECT * FROM Utilisateur WHERE email = ?",
         [email],
-        (err, result) => {
+        async (err, result) => {
             if (err) {
                 return res.status(500).json({ success: false, message: "Erreur serveur" });
             }
@@ -81,7 +83,8 @@ app.post("/api/auth/login", (req, res) => {
                 return res.status(403).json({ success: false, message: "Compte non activé" });
             }
 
-            if (!comparePassword(password, user.mot_de_passe)) {
+            const passwordMatch = await comparePassword(password, user.mot_de_passe);
+            if (!passwordMatch) {
                 return res.status(401).json({ success: false, message: "Mot de passe incorrect" });
             }
 
@@ -158,7 +161,7 @@ app.post("/api/auth/activate", (req, res) => {
     db.query(
         "SELECT id_utilisateur, token_expiration FROM Utilisateur WHERE token_activation = ?",
         [token],
-        (err, results) => {
+        async (err, results) => {
             if (err) {
                 return res.status(500).json({ success: false, message: "Erreur serveur" });
             }
@@ -173,7 +176,7 @@ app.post("/api/auth/activate", (req, res) => {
                 return res.status(400).json({ success: false, message: "Token expiré" });
             }
 
-            const hashedPassword = hashPassword(password);
+            const hashedPassword = await hashPassword(password);
 
             db.query(
                 "UPDATE Utilisateur SET mot_de_passe = ?, est_actif = TRUE, token_activation = NULL, token_expiration = NULL WHERE id_utilisateur = ?",
@@ -196,6 +199,7 @@ ROUTES ADMIN
 */
 
 app.use("/api/admin", adminRoutes(db));
+app.use("/api/encadrant", encadrantRoutes(db));
 
 /*
 ----------------------------------

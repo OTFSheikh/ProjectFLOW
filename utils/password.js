@@ -1,10 +1,15 @@
-function hashPassword(plainText) {
-    // TODO: remplacer par bcrypt.hash(plainText, 10) en production
-    return plainText;
+const bcrypt = require("bcryptjs");
+
+async function hashPassword(plainText) {
+    return bcrypt.hash(plainText, 10);
 }
 
-function comparePassword(plainText, stored) {
-    // TODO: remplacer par bcrypt.compare(plainText, stored) en production
+async function comparePassword(plainText, stored) {
+    if (!stored) return false;
+    if (stored.startsWith("$2")) {
+        return bcrypt.compare(plainText, stored);
+    }
+    // Fallback pour les mots de passe encore en clair (migration progressive)
     return plainText === stored;
 }
 
