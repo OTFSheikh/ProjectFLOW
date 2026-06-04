@@ -1,0 +1,480 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --primary: #FF8904;
+    --primary-dark: #e07a00;
+    --primary-light: #fff3e0;
+    --secondary: #10b981;
+    --secondary-light: #d1fae5;
+    --danger: #ef4444;
+    --danger-light: #fee2e2;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --info: #3b82f6;
+    --info-light: #dbeafe;
+    --gray-900: #111827;
+    --gray-800: #1f2937;
+    --gray-700: #374151;
+    --gray-600: #4b5563;
+    --gray-500: #6b7280;
+    --gray-400: #9ca3af;
+    --gray-300: #d1d5db;
+    --gray-200: #e5e7eb;
+    --gray-100: #f3f4f6;
+    --gray-50: #f9fafb;
+    --white: #ffffff;
+    --radius: 6px;
+    --radius-sm: 4px;
+    --shadow: 0 1px 2px rgba(0,0,0,0.04);
+    --transition: 150ms ease;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    display: flex;
+    min-height: 100vh;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* ============================================
+   SIDEBAR
+============================================ */
+#sidebar {
+    width: 240px;
+    background: var(--white);
+    border-right: 1px solid var(--gray-200);
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem 0.75rem;
+    z-index: 50;
+    overflow-y: auto;
+    transition: transform 150ms ease;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+    padding: 0 0.5rem;
+}
+
+.sidebar-logo {
+    width: 28px;
+    height: 28px;
+    background: var(--primary);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-weight: 700;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+.sidebar-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.sidebar-subtitle {
+    font-size: 0.7rem;
+    color: var(--gray-400);
+}
+
+.sidebar-nav {
+    list-style: none;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--gray-600);
+    font-size: 0.82rem;
+    font-weight: 450;
+    transition: all var(--transition);
+}
+
+.sidebar-link:hover {
+    background: var(--gray-100);
+    color: var(--gray-900);
+}
+
+.sidebar-link.active {
+    background: var(--gray-100);
+    color: var(--gray-900);
+    font-weight: 600;
+    border-left: 2px solid var(--primary);
+    padding-left: calc(0.75rem - 2px);
+}
+
+.sidebar-link i {
+    width: 18px;
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.sidebar-badge {
+    margin-left: auto;
+    background: var(--primary);
+    color: var(--white);
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.sidebar-footer {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--gray-100);
+    margin-top: auto;
+}
+
+.sidebar-profil {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-avatar {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+.sidebar-profil-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-profil-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-profil-role {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+}
+
+/* Sidebar toggle */
+.sidebar-toggle {
+    position: fixed;
+    top: 0.75rem;
+    left: 248px;
+    width: 24px;
+    height: 24px;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 51;
+    font-size: 0.65rem;
+    color: var(--gray-400);
+    transition: left 150ms ease, transform 150ms ease;
+}
+
+.sidebar-toggle:hover {
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+body.sidebar-collapsed #sidebar {
+    transform: translateX(-240px);
+}
+
+body.sidebar-collapsed .main-content {
+    margin-left: 0;
+}
+
+body.sidebar-collapsed .sidebar-toggle {
+    left: 8px;
+    transform: rotate(180deg);
+}
+
+/* ============================================
+   MAIN CONTENT
+============================================ */
+.main-content {
+    margin-left: 240px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    transition: margin-left 150ms ease;
+}
+
+.topbar {
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-200);
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.topbar h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.breadcrumb {
+    font-size: 0.72rem;
+    color: var(--gray-400);
+    margin-bottom: 0.25rem;
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: var(--gray-700);
+}
+
+.page-content {
+    padding: 1.5rem;
+    flex: 1;
+}
+
+/* ============================================
+   CARDS
+============================================ */
+.card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0.75rem;
+}
+
+/* ============================================
+   STATS GRID
+============================================ */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    transition: all var(--transition);
+}
+
+.stat-card:hover {
+    border-color: var(--gray-300);
+    box-shadow: var(--shadow);
+}
+
+.stat-label {
+    font-size: 0.72rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.stat-value.warning { color: var(--warning); }
+.stat-value.danger { color: var(--danger); }
+
+/* ============================================
+   BADGES
+============================================ */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.badge-primary { background: var(--primary-light); color: var(--primary-dark); }
+.badge-success { background: var(--secondary-light); color: var(--secondary); }
+.badge-danger { background: var(--danger-light); color: var(--danger); }
+.badge-warning { background: var(--warning-light); color: var(--warning); }
+.badge-info { background: var(--info-light); color: var(--info); }
+.badge-gray { background: var(--gray-100); color: var(--gray-600); }
+
+/* ============================================
+   BUTTONS
+============================================ */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    text-decoration: none;
+    font-family: inherit;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: var(--white);
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.btn-secondary {
+    background: var(--white);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+}
+
+.btn-secondary:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-300);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: var(--white);
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* ============================================
+   ÉTATS & STATUTS (Documentation — partie 4)
+   Rendre visibles : statut de tâche, priorité,
+   états de groupe/projet, statut de livrable.
+============================================ */
+
+/* --- Statut de tâche : À faire / En cours / Terminé --- */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+.status-pill::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.status-afaire  { background: var(--gray-100);      color: var(--gray-600); }
+.status-encours { background: var(--info-light);    color: var(--info); }
+.status-termine { background: var(--secondary-light); color: var(--secondary); }
+
+/* --- Priorité de tâche : Haute / Moyenne / Basse (pastille) --- */
+.priority-dot,
+.task-row .priority,
+.priority {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.priority-haute   { background: var(--danger); }   /* rouge  = urgent */
+.priority-moyenne { background: var(--warning); }  /* orange = normal (défaut) */
+.priority-basse   { background: var(--secondary); }/* vert   = faible */
+
+/* Variante "étiquette" de priorité si besoin d'un libellé texte */
+.priority-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+.priority-label.priority-haute   { background: var(--danger-light);    color: var(--danger); }
+.priority-label.priority-moyenne { background: var(--warning-light);   color: var(--warning); }
+.priority-label.priority-basse   { background: var(--secondary-light); color: var(--secondary); }
+
+/* --- États de GROUPE : Proposé → En cours → En retard → Livré → Soutenu → Clôturé ---
+   (utilisables comme <span class="badge etat-groupe-livre">…</span>) --- */
+.etat-groupe-propose  { background: var(--gray-100);      color: var(--gray-600); }
+.etat-groupe-encours  { background: var(--info-light);    color: var(--info); }
+.etat-groupe-enretard { background: var(--warning-light); color: var(--warning); }
+.etat-groupe-livre    { background: var(--secondary-light); color: var(--secondary); }
+.etat-groupe-soutenu  { background: var(--primary-light); color: var(--primary-dark); }
+.etat-groupe-cloture  { background: var(--gray-200);      color: var(--gray-700); }
+
+/* --- États de PROJET : Ouvert / Clôturé --- */
+.etat-projet-ouvert   { background: var(--secondary-light); color: var(--secondary); }
+.etat-projet-cloture  { background: var(--gray-200);        color: var(--gray-700); }
+
+/* --- Statut de validation des LIVRABLES : En attente / Validé / Refusé --- */
+.validation-en-attente { background: var(--warning-light);   color: var(--warning); }
+.validation-valide     { background: var(--secondary-light); color: var(--secondary); }
+.validation-refuse     { background: var(--danger-light);    color: var(--danger); }

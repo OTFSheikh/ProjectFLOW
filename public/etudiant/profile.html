@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Mon compte</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        .profile-layout {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 1.25rem;
+        }
+
+        /* ============================================
+           COLONNE GAUCHE : Carte profil
+        ============================================ */
+        .profile-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 1.5rem 1.25rem;
+            text-align: center;
+            position: sticky;
+            top: 1rem;
+        }
+
+        .profile-avatar-big {
+            width: 90px;
+            height: 90px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.75rem;
+            margin: 0 auto 1rem;
+        }
+
+        .profile-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+
+        .profile-email {
+            font-size: 0.82rem;
+            color: var(--gray-500);
+            margin-bottom: 1rem;
+        }
+
+        .profile-badges {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .profile-stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.625rem 0;
+            border-bottom: 1px solid var(--gray-100);
+            font-size: 0.85rem;
+        }
+        .profile-stat-row:last-child { border-bottom: none; }
+        .profile-stat-row .label {
+            color: var(--gray-600);
+        }
+        .profile-stat-row .value {
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        /* ============================================
+           COLONNE DROITE : Formulaires
+        ============================================ */
+        .form-section {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .form-section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+        .form-section-help {
+            font-size: 0.78rem;
+            color: var(--gray-500);
+            margin-bottom: 1rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .form-grid.full { grid-template-columns: 1fr; }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .form-field label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+        .form-field input,
+        .form-field select {
+            padding: 0.6rem 0.75rem;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 0.88rem;
+            color: var(--gray-900);
+            transition: border-color var(--transition);
+            background: var(--white);
+        }
+        .form-field input:focus,
+        .form-field select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .form-field input:disabled {
+            background: var(--gray-50);
+            color: var(--gray-500);
+            cursor: not-allowed;
+        }
+        .form-field .hint {
+            font-size: 0.7rem;
+            color: var(--gray-500);
+            font-style: italic;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--gray-100);
+        }
+        .form-msg {
+            font-size: 0.78rem;
+            margin-right: auto;
+            align-self: center;
+        }
+        .form-msg.ok { color: var(--secondary); }
+        .form-msg.err { color: var(--danger); }
+
+        /* Préférences notif */
+        .pref-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .pref-row:last-child { border-bottom: none; }
+        .pref-info .pref-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 0.15rem;
+        }
+        .pref-info .pref-desc {
+            font-size: 0.74rem;
+            color: var(--gray-500);
+        }
+
+        /* Switch toggle */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--gray-300);
+            transition: 0.3s;
+            border-radius: 22px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--white);
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+        .switch input:checked + .slider {
+            background: var(--primary);
+        }
+        .switch input:checked + .slider:before {
+            transform: translateX(18px);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .profile-layout {
+                grid-template-columns: 1fr;
+            }
+            .profile-card { position: static; }
+        }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Mon compte</div>
+                <h1>Mon compte</h1>
+            </div>
+        </header>
+
+        <main class="page-content">
+
+            <div class="profile-layout">
+
+                <!-- ============================ -->
+                <!-- COLONNE GAUCHE : Profil -->
+                <!-- ============================ -->
+                <aside class="profile-card">
+                    <div class="profile-avatar-big" id="profileAvatar">…</div>
+                    <div class="profile-name" id="profileName">…</div>
+                    <div class="profile-email" id="profileEmail">…</div>
+
+                    <div class="profile-badges" id="profileBadges"></div>
+
+                    <div class="profile-stat-row">
+                        <span class="label">Projets actifs</span>
+                        <span class="value" id="statProjects">…</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span class="label">Groupes où Team Leader</span>
+                        <span class="value" id="statLeader">…</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span class="label">Membre depuis</span>
+                        <span class="value" id="statSince">…</span>
+                    </div>
+                </aside>
+
+                <!-- ============================ -->
+                <!-- COLONNE DROITE : Formulaires -->
+                <!-- ============================ -->
+                <section>
+
+                    <!-- ===== Infos personnelles ===== -->
+                    <div class="form-section">
+                        <div class="form-section-title">Informations personnelles</div>
+                        <div class="form-section-help">Vos informations de base. L'email ne peut pas être modifié.</div>
+
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="firstname">Prénom</label>
+                                <input type="text" id="firstname" />
+                            </div>
+                            <div class="form-field">
+                                <label for="lastname">Nom</label>
+                                <input type="text" id="lastname" />
+                            </div>
+                            <div class="form-field">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" disabled />
+                                <span class="hint">L'email est utilisé pour la connexion et ne peut pas être modifié.</span>
+                            </div>
+                            <div class="form-field">
+                                <label for="classe">Classe / Formation</label>
+                                <input type="text" id="classe" placeholder="Ex : Master IA & Big Data" />
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <span class="form-msg" id="infoMsg"></span>
+                            <button class="btn btn-secondary" id="cancelInfoBtn">Annuler</button>
+                            <button class="btn btn-primary" id="saveInfoBtn">
+                                <i class="fas fa-save"></i> Enregistrer
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ===== Mot de passe ===== -->
+                    <div class="form-section">
+                        <div class="form-section-title">Mot de passe</div>
+                        <div class="form-section-help">Modifiez votre mot de passe régulièrement pour sécuriser votre compte.</div>
+
+                        <div class="form-grid full">
+                            <div class="form-field">
+                                <label for="oldpwd">Mot de passe actuel</label>
+                                <input type="password" id="oldpwd" placeholder="••••••••" />
+                            </div>
+                        </div>
+                        <div class="form-grid" style="margin-top:1rem;">
+                            <div class="form-field">
+                                <label for="newpwd">Nouveau mot de passe</label>
+                                <input type="password" id="newpwd" placeholder="••••••••" />
+                                <span class="hint">Minimum 8 caractères, avec au moins 1 chiffre et 1 majuscule.</span>
+                            </div>
+                            <div class="form-field">
+                                <label for="newpwd2">Confirmer le nouveau mot de passe</label>
+                                <input type="password" id="newpwd2" placeholder="••••••••" />
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <span class="form-msg" id="pwdMsg"></span>
+                            <button class="btn btn-primary" id="changePwdBtn">
+                                <i class="fas fa-key"></i> Modifier le mot de passe
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ===== Préférences notifications (UI uniquement) ===== -->
+                    <div class="form-section">
+                        <div class="form-section-title">Préférences de notifications</div>
+                        <div class="form-section-help">Choisissez quelles notifications vous souhaitez recevoir. (Non persisté : aucun endpoint de préférences pour l'instant.)</div>
+
+                        <div class="pref-row">
+                            <div class="pref-info">
+                                <div class="pref-title">Livrables validés ou refusés</div>
+                                <div class="pref-desc">Recevoir une notification quand un livrable est traité par l'encadrant.</div>
+                            </div>
+                            <label class="switch"><input type="checkbox" checked /><span class="slider"></span></label>
+                        </div>
+                        <div class="pref-row">
+                            <div class="pref-info">
+                                <div class="pref-title">Nouvelles tâches assignées</div>
+                                <div class="pref-desc">Être prévenu quand le Team Leader vous assigne une nouvelle tâche.</div>
+                            </div>
+                            <label class="switch"><input type="checkbox" checked /><span class="slider"></span></label>
+                        </div>
+                        <div class="pref-row">
+                            <div class="pref-info">
+                                <div class="pref-title">Messages du chat</div>
+                                <div class="pref-desc">Recevoir une notif à chaque nouveau message dans le chat du groupe.</div>
+                            </div>
+                            <label class="switch"><input type="checkbox" /><span class="slider"></span></label>
+                        </div>
+                        <div class="pref-row">
+                            <div class="pref-info">
+                                <div class="pref-title">Rappels d'échéances</div>
+                                <div class="pref-desc">Recevoir un rappel 2 jours avant l'échéance d'une tâche.</div>
+                            </div>
+                            <label class="switch"><input type="checkbox" checked /><span class="slider"></span></label>
+                        </div>
+                        <div class="pref-row">
+                            <div class="pref-info">
+                                <div class="pref-title">Notifications par email</div>
+                                <div class="pref-desc">En plus de l'app, recevoir un email pour les notifications importantes.</div>
+                            </div>
+                            <label class="switch"><input type="checkbox" /><span class="slider"></span></label>
+                        </div>
+                    </div>
+
+                    <!-- ===== Zone danger ===== -->
+                    <div class="form-section" style="border-color: var(--danger-light);">
+                        <div class="form-section-title" style="color: var(--danger);">
+                            <i class="fas fa-exclamation-triangle"></i> Zone sensible
+                        </div>
+                        <div class="form-section-help">Actions irréversibles. À utiliser avec précaution.</div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem 0;">
+                            <div>
+                                <div style="font-weight:600; font-size:0.88rem; color:var(--gray-900);">Se déconnecter</div>
+                                <div style="font-size:0.74rem; color:var(--gray-500); margin-top:0.15rem;">Fermera votre session sur ce navigateur.</div>
+                            </div>
+                            <button class="btn btn-secondary" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i> Déconnexion
+                            </button>
+                        </div>
+                    </div>
+
+                </section>
+
+            </div>
+
+        </main>
+    </div>
+
+    <script src="sidebar.js"></script>
+    <script>
+    /* ============================================================
+       GET /api/etudiant/profile -> { utilisateur: {id_utilisateur,
+           nom, prenom, email, classe, date_inscription} }
+       PUT /api/etudiant/profile  body { nom, prenom, classe }
+       PUT /api/etudiant/profile/password body { oldPassword, newPassword }
+       Badges Team Leader dérivés de GET /api/etudiant/projects
+       (groupes où est_team_leader = vrai).
+    ============================================================ */
+    renderSidebar("profile");
+    checkEtudiantAuth();
+
+    const API = "/api/etudiant";
+    let loaded = { prenom: "", nom: "", classe: "" };
+
+    function esc(s) {
+        if (s == null) return "";
+        return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    }
+    function initials(p, n) { return ((p ? p[0] : "") + (n ? n[0] : "")).toUpperCase() || "??"; }
+    function fmtMonthYear(d) {
+        if (!d) return "—";
+        return new Date(d).toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+    }
+    function setMsg(el, text, ok) {
+        el.textContent = text;
+        el.className = "form-msg " + (ok ? "ok" : "err");
+        if (text) setTimeout(() => { el.textContent = ""; }, 4000);
+    }
+
+    async function api(method, path, body) {
+        const opt = { method, credentials: "include", headers: {} };
+        if (body) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+        const res = await fetch(API + path, opt);
+        if (res.status === 401) { location.href = "/login.html"; throw new Error("unauth"); }
+        let data = null; try { data = await res.json(); } catch (e) {}
+        return { ok: res.ok, status: res.status, data };
+    }
+
+    function fillForm() {
+        document.getElementById("firstname").value = loaded.prenom;
+        document.getElementById("lastname").value = loaded.nom;
+        document.getElementById("classe").value = loaded.classe;
+    }
+
+    async function loadProfile() {
+        const { ok, data } = await api("GET", "/profile");
+        if (!ok || !data.utilisateur) return;
+        const u = data.utilisateur;
+        loaded = { prenom: u.prenom || "", nom: u.nom || "", classe: u.classe || "" };
+        document.getElementById("profileAvatar").textContent = initials(u.prenom, u.nom);
+        document.getElementById("profileName").textContent = `${u.prenom || ""} ${u.nom || ""}`.trim();
+        document.getElementById("profileEmail").textContent = u.email || "";
+        document.getElementById("email").value = u.email || "";
+        document.getElementById("statSince").textContent = fmtMonthYear(u.date_inscription);
+        fillForm();
+    }
+
+    async function loadRoleBadges() {
+        const { ok, data } = await api("GET", "/projects");
+        const badges = document.getElementById("profileBadges");
+        let html = `<span class="badge badge-info" style="justify-content:center;"><i class="fas fa-user-graduate"></i> Étudiant</span>`;
+        if (ok && data.projects) {
+            const actifs = data.projects.filter(p => p.etat_groupe !== "Cloture").length;
+            const leaderGroups = data.projects.filter(p => p.est_team_leader);
+            document.getElementById("statProjects").textContent = actifs;
+            document.getElementById("statLeader").textContent = leaderGroups.length;
+            leaderGroups.forEach(p => {
+                html += `<span class="badge badge-primary" style="justify-content:center;"><i class="fas fa-crown"></i> Team Leader (${esc(p.nom_groupe || p.nom_projet)})</span>`;
+            });
+        }
+        badges.innerHTML = html;
+    }
+
+    /* ===== Enregistrer infos ===== */
+    document.getElementById("saveInfoBtn").addEventListener("click", async () => {
+        const nom = document.getElementById("lastname").value.trim();
+        const prenom = document.getElementById("firstname").value.trim();
+        const classe = document.getElementById("classe").value.trim();
+        if (!nom || !prenom) { setMsg(document.getElementById("infoMsg"), "Prénom et nom requis.", false); return; }
+        const { ok } = await api("PUT", "/profile", { nom, prenom, classe });
+        if (ok) {
+            loaded = { prenom, nom, classe };
+            document.getElementById("profileName").textContent = `${prenom} ${nom}`;
+            document.getElementById("profileAvatar").textContent = initials(prenom, nom);
+            setMsg(document.getElementById("infoMsg"), "Enregistré ✓", true);
+        } else {
+            setMsg(document.getElementById("infoMsg"), "Erreur lors de l'enregistrement.", false);
+        }
+    });
+    document.getElementById("cancelInfoBtn").addEventListener("click", fillForm);
+
+    /* ===== Changer mot de passe ===== */
+    document.getElementById("changePwdBtn").addEventListener("click", async () => {
+        const oldPassword = document.getElementById("oldpwd").value;
+        const newPassword = document.getElementById("newpwd").value;
+        const confirm = document.getElementById("newpwd2").value;
+        const msg = document.getElementById("pwdMsg");
+        if (!oldPassword || !newPassword) { setMsg(msg, "Tous les champs sont requis.", false); return; }
+        if (newPassword !== confirm) { setMsg(msg, "Les deux mots de passe ne correspondent pas.", false); return; }
+        if (newPassword.length < 8 || !/[0-9]/.test(newPassword) || !/[A-Z]/.test(newPassword)) {
+            setMsg(msg, "Min. 8 caractères, 1 chiffre et 1 majuscule.", false); return;
+        }
+        const { ok, status } = await api("PUT", "/profile/password", { oldPassword, newPassword });
+        if (ok) {
+            ["oldpwd", "newpwd", "newpwd2"].forEach(id => document.getElementById(id).value = "");
+            setMsg(msg, "Mot de passe modifié ✓", true);
+        } else {
+            setMsg(msg, status === 401 ? "Ancien mot de passe incorrect." : "Erreur.", false);
+        }
+    });
+
+    /* ===== Déconnexion ===== */
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+        try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch (e) {}
+        location.href = "/login.html";
+    });
+
+    loadProfile();
+    loadRoleBadges();
+    </script>
+</body>
+</html>

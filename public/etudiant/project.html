@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Détail projet</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        /* ============================================
+           HEADER PROJET
+        ============================================ */
+        .project-header {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .project-header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .project-title-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .project-title-row h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+        .project-meta-row {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            font-size: 0.82rem;
+            color: var(--gray-600);
+            margin-top: 0.5rem;
+        }
+        .project-meta-row i { margin-right: 0.35rem; color: var(--gray-400); }
+        .members-stack {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .members-avatars {
+            display: flex;
+        }
+        .member-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.7rem;
+            border: 2px solid var(--white);
+            margin-left: -8px;
+            position: relative;
+        }
+        .member-avatar:first-child { margin-left: 0; }
+        .member-avatar.has-crown::after {
+            content: '👑';
+            position: absolute;
+            top: -8px;
+            right: -4px;
+            font-size: 0.7rem;
+        }
+        .members-count {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            font-weight: 500;
+        }
+
+        /* ============================================
+           BANDEAU TEAM LEADER
+        ============================================ */
+        .team-leader-banner {
+            background: var(--primary-light);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 0.875rem 1.125rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            font-size: 0.85rem;
+            color: var(--gray-800);
+        }
+        .team-leader-banner i {
+            color: var(--primary);
+            font-size: 1rem;
+        }
+        .team-leader-banner strong { color: var(--primary-dark); }
+
+        /* ============================================
+           ONGLETS
+        ============================================ */
+        .tabs {
+            display: flex;
+            gap: 0.25rem;
+            border-bottom: 1px solid var(--gray-200);
+            margin-bottom: 1.25rem;
+            background: var(--white);
+            padding: 0 1rem;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+        .tab {
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--gray-600);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all var(--transition);
+            background: none;
+            border-left: none;
+            border-right: none;
+            border-top: none;
+            font-family: inherit;
+        }
+        .tab:hover { color: var(--gray-900); }
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* ============================================
+           CONTENU DES ONGLETS
+        ============================================ */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Two columns layout */
+        .two-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        /* Alerte */
+        .alert {
+            padding: 0.875rem 1.125rem;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.625rem;
+            font-size: 0.85rem;
+        }
+        .alert-warning {
+            background: var(--warning-light);
+            border-left: 4px solid var(--warning);
+            color: var(--gray-800);
+        }
+        .alert-warning i { color: var(--warning); }
+        .alert strong { font-weight: 600; }
+
+        /* Échéances liste */
+        .deadline-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.625rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .deadline-item:last-child { border-bottom: none; }
+        .deadline-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+        .deadline-icon.jalon { background: var(--primary-light); color: var(--primary); }
+        .deadline-icon.tache { background: var(--info-light); color: var(--info); }
+        .deadline-info .name { font-size: 0.85rem; font-weight: 500; color: var(--gray-900); }
+        .deadline-info .type { font-size: 0.72rem; color: var(--gray-500); }
+        .deadline-date { font-size: 0.78rem; font-weight: 500; color: var(--gray-700); }
+
+        /* Activité */
+        .activity-list { display: flex; flex-direction: column; }
+        .activity-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.625rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-top: 0.5rem;
+            flex-shrink: 0;
+        }
+        .activity-dot.success { background: var(--secondary); }
+        .activity-dot.info { background: var(--info); }
+        .activity-dot.warning { background: var(--warning); }
+        .activity-dot.gray { background: var(--gray-400); }
+        .activity-text { font-size: 0.82rem; color: var(--gray-700); }
+        .activity-text strong { color: var(--gray-900); font-weight: 600; }
+        .activity-time { font-size: 0.7rem; color: var(--gray-500); }
+        .activity-icon {
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; flex-shrink: 0;
+            background: var(--info-light); color: var(--info);
+        }
+        .activity-icon.success { background: var(--secondary-light); color: var(--secondary); }
+        .activity-icon.danger { background: var(--danger-light); color: var(--danger); }
+        .activity-content { flex: 1; }
+
+        /* ============================================
+           ONGLET JALONS & TÂCHES
+        ============================================ */
+        .tasks-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .filters-row {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .filter-chip {
+            padding: 0.35rem 0.75rem;
+            border-radius: 18px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        .filter-chip:hover { background: var(--gray-50); }
+        .filter-chip.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+
+        /* Jalons */
+        .jalon-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            margin-bottom: 0.75rem;
+            overflow: hidden;
+        }
+        .jalon-header {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 0.875rem 1rem;
+            cursor: pointer;
+            background: var(--white);
+        }
+        .jalon-chevron {
+            width: 20px;
+            text-align: center;
+            color: var(--gray-400);
+            font-size: 0.75rem;
+        }
+        .jalon-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+        .jalon-subtitle {
+            font-size: 0.74rem;
+            color: var(--gray-500);
+            margin-top: 0.2rem;
+        }
+        .jalon-progress {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 130px;
+        }
+        .jalon-progress-bar {
+            flex: 1;
+            height: 5px;
+            background: var(--gray-100);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .jalon-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+        }
+        .jalon-progress-value {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            min-width: 30px;
+            text-align: right;
+        }
+        .jalon-actions {
+            display: flex;
+            gap: 0.375rem;
+            align-items: center;
+        }
+        .icon-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            color: var(--gray-600);
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all var(--transition);
+        }
+        .icon-btn:hover { background: var(--gray-50); color: var(--gray-900); }
+        .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+        .jalon-tasks {
+            border-top: 1px solid var(--gray-100);
+            padding: 0.5rem;
+            background: var(--gray-50);
+        }
+        .task-row {
+            display: grid;
+            grid-template-columns: auto 1.5fr auto auto auto auto auto;
+            gap: 0.875rem;
+            align-items: center;
+            padding: 0.625rem 0.75rem;
+            background: var(--white);
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.25rem;
+            transition: all var(--transition);
+            font-size: 0.82rem;
+        }
+        .task-row:hover { box-shadow: var(--shadow); }
+        .task-row .priority { width: 8px; height: 8px; border-radius: 50%; }
+        .task-row .name { font-weight: 500; color: var(--gray-900); }
+        .task-row .name.done { text-decoration: line-through; color: var(--gray-500); }
+        .task-row .date { font-size: 0.75rem; color: var(--gray-500); }
+        .task-row .date.late { color: var(--danger); font-weight: 600; }
+        .task-row .assignees { display: flex; }
+        .task-row .assignee-avatar {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.6rem;
+            border: 2px solid var(--white);
+            margin-left: -6px;
+        }
+        .task-row .assignee-avatar:first-child { margin-left: 0; }
+
+        /* ============================================
+           ONGLET LIVRABLES
+        ============================================ */
+        .deliv-section { margin-bottom: 1.5rem; }
+        .deliv-section-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+        .deliv-section-help {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            font-style: italic;
+            margin-bottom: 0.75rem;
+        }
+        .deliv-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.875rem 1rem;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .deliv-card.refused {
+            border-left: 4px solid var(--danger);
+        }
+        .deliv-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            background: var(--danger-light);
+            color: var(--danger);
+        }
+        .deliv-icon.zip { background: var(--gray-100); color: var(--gray-600); }
+        .deliv-icon.pptx { background: var(--warning-light); color: var(--warning); }
+        .deliv-info .name { font-size: 0.88rem; font-weight: 600; color: var(--gray-900); }
+        .deliv-info .meta { font-size: 0.72rem; color: var(--gray-500); margin-top: 0.15rem; }
+        .deliv-refused-block {
+            background: var(--danger-light);
+            border-radius: var(--radius);
+            padding: 0.875rem 1rem;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            margin-left: 4px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            align-items: center;
+        }
+        .refused-text strong { color: var(--danger); font-weight: 600; }
+        .refused-text p { font-size: 0.82rem; color: var(--gray-700); margin-top: 0.25rem; }
+        .refused-signature { font-size: 0.7rem; color: var(--gray-500); font-style: italic; margin-top: 0.35rem; }
+        .btn-redeposer {
+            background: var(--danger);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            border: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-redeposer:hover { background: #dc2626; }
+
+        /* ============================================
+           ONGLET CHAT
+        ============================================ */
+        .chat-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 1rem;
+            min-height: 500px;
+        }
+        .chat-participants {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 1rem;
+        }
+        .chat-participants h3 {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+        .chat-participants .help {
+            font-size: 0.7rem;
+            color: var(--gray-500);
+            font-style: italic;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .participant {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0;
+        }
+        .participant-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.7rem;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .participant-avatar.has-crown::after {
+            content: '👑';
+            position: absolute;
+            top: -6px;
+            right: -3px;
+            font-size: 0.65rem;
+        }
+        .participant-info { flex: 1; min-width: 0; }
+        .participant-name { font-size: 0.78rem; font-weight: 600; color: var(--gray-900); }
+        .participant-status { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.1rem; }
+        .chat-thread {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .chat-header h3 { font-size: 0.95rem; font-weight: 700; color: var(--gray-900); }
+        .chat-header p { font-size: 0.72rem; color: var(--gray-500); margin-top: 0.2rem; }
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.875rem;
+            overflow-y: auto;
+            max-height: 450px;
+        }
+        .chat-message {
+            display: flex;
+            gap: 0.5rem;
+            max-width: 75%;
+        }
+        .chat-message.me {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .chat-msg-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.65rem;
+            flex-shrink: 0;
+        }
+        .chat-bubble-wrap { display: flex; flex-direction: column; gap: 0.2rem; }
+        .chat-bubble-header {
+            font-size: 0.7rem;
+            color: var(--gray-600);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .chat-bubble-header strong { color: var(--gray-900); font-weight: 600; }
+        .chat-bubble {
+            padding: 0.6rem 0.875rem;
+            border-radius: 10px;
+            background: var(--gray-100);
+            font-size: 0.83rem;
+            color: var(--gray-800);
+            line-height: 1.5;
+            word-break: break-word;
+        }
+        .chat-message.me .chat-bubble {
+            background: var(--primary-light);
+            color: var(--gray-900);
+        }
+        .chat-composer {
+            border-top: 1px solid var(--gray-100);
+            padding: 0.75rem 1rem;
+        }
+        .chat-composer textarea {
+            width: 100%;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.6rem 0.75rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+            resize: none;
+            min-height: 50px;
+        }
+        .chat-composer textarea:focus { outline: none; border-color: var(--primary); }
+        .chat-composer-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.5rem;
+        }
+        .chat-composer .icons { display: flex; gap: 0.5rem; color: var(--gray-400); font-size: 0.9rem; }
+        .chat-composer-help { font-size: 0.7rem; color: var(--gray-500); margin-top: 0.4rem; font-style: italic; }
+
+        /* ============================================
+           AJOUTS : statut select, états vides, modales
+        ============================================ */
+        .status-select {
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm, 6px);
+            background: var(--white);
+            font-family: inherit;
+            font-size: 0.72rem;
+            padding: 0.2rem 0.4rem;
+            color: var(--gray-700);
+            cursor: pointer;
+        }
+        .status-select:focus { outline: none; border-color: var(--primary); }
+        .empty-state {
+            text-align: center;
+            color: var(--gray-500);
+            font-size: 0.85rem;
+            padding: 1.5rem;
+        }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--white);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 480px;
+            max-height: 90vh;
+            overflow: auto;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+        }
+        .modal-head {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--gray-100);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-head h3 { font-size: 1rem; font-weight: 700; color: var(--gray-900); }
+        .modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.85rem; }
+        .modal-foot {
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--gray-100);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 0.3rem;
+        }
+        .form-control {
+            width: 100%;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.5rem 0.7rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+            color: var(--gray-800);
+        }
+        .form-control:focus { outline: none; border-color: var(--primary); }
+        .assignees-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            max-height: 170px;
+            overflow: auto;
+            border: 1px solid var(--gray-100);
+            border-radius: var(--radius);
+            padding: 0.5rem;
+        }
+        .assignees-list label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.83rem;
+            font-weight: 500;
+            color: var(--gray-800);
+            margin: 0;
+        }
+        .close-x {
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            line-height: 1;
+            color: var(--gray-400);
+            cursor: pointer;
+        }
+        .close-x:hover { color: var(--gray-700); }
+
+        /* Documents du sujet */
+        .doc-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .doc-item:last-child { border-bottom: none; }
+        .doc-icon {
+            width: 38px; height: 38px; border-radius: var(--radius);
+            display: flex; align-items: center; justify-content: center;
+            background: var(--primary-light); color: var(--primary); font-size: 1rem;
+        }
+        .doc-name { font-size: 0.88rem; font-weight: 600; color: var(--gray-900); }
+        .doc-meta { font-size: 0.72rem; color: var(--gray-500); margin-top: 0.15rem; }
+
+        /* Évaluation */
+        .eval-note-big { font-size: 2rem; font-weight: 700; color: var(--primary); }
+        .eval-note-label { font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.3px; }
+        .eval-meta { font-size: 0.72rem; color: var(--gray-500); margin-top: 0.5rem; }
+        .eval-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .eval-table th {
+            text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px;
+            color: var(--gray-500); padding: 0.5rem; border-bottom: 1px solid var(--gray-200);
+        }
+        .eval-table td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--gray-100); color: var(--gray-800); }
+        .eval-table tr:last-child td { border-bottom: none; }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb" id="breadcrumb">Mes projets</div>
+                <h1>Détail du projet</h1>
+            </div>
+        </header>
+
+        <main class="page-content">
+
+            <!-- Header projet (rempli par JS) -->
+            <div class="project-header" id="projectHeader">
+                <div class="empty-state">Chargement du projet…</div>
+            </div>
+
+            <!-- Bandeau Team Leader (affiché uniquement pour le TL via data-tl-only) -->
+            <div class="team-leader-banner" id="tlBanner" data-tl-only style="display:none;">
+                <i class="fas fa-crown"></i>
+                <span>👑 Vous êtes <strong>Team Leader</strong> de ce groupe — vous pouvez créer les jalons et les tâches, les assigner, et choisir le sujet.</span>
+            </div>
+
+            <!-- Onglets -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('overview', this)">Vue d'ensemble</button>
+                <button class="tab" onclick="switchTab('subject', this)">Sujet</button>
+                <button class="tab" onclick="switchTab('tasks', this)">Jalons &amp; Tâches</button>
+                <button class="tab" onclick="switchTab('deliverables', this)">Livrables</button>
+                <button class="tab" onclick="switchTab('chat', this)">Chat</button>
+                <button class="tab" onclick="switchTab('evaluation', this)">Évaluation</button>
+            </div>
+
+            <!-- ====== ONGLET 1 : VUE D'ENSEMBLE ====== -->
+            <div id="tab-overview" class="tab-content active">
+                <div class="stats-grid" id="overviewStats"></div>
+                <div id="overviewAlert"></div>
+                <div class="card">
+                    <div class="card-title">Prochaines échéances</div>
+                    <div id="overviewDeadlines"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Activité récente</div>
+                    <div class="activity-list" id="overviewActivity"></div>
+                </div>
+            </div>
+
+            <!-- ====== ONGLET 2 : SUJET ====== -->
+            <div id="tab-subject" class="tab-content">
+                <div id="subjectContent"></div>
+            </div>
+
+            <!-- ====== ONGLET 3 : JALONS & TÂCHES ====== -->
+            <div id="tab-tasks" class="tab-content">
+                <div class="tasks-toolbar">
+                    <div class="filters-row" id="taskFilters">
+                        <button class="filter-chip active" data-tfilter="all">Toutes les tâches</button>
+                        <button class="filter-chip" data-tfilter="A_faire">À faire</button>
+                        <button class="filter-chip" data-tfilter="En_cours">En cours</button>
+                        <button class="filter-chip" data-tfilter="Terminee">Terminées</button>
+                    </div>
+                    <button class="btn btn-primary" id="btnNewJalon" data-tl-only style="display:none;">
+                        <i class="fas fa-plus"></i> Nouveau jalon
+                    </button>
+                </div>
+                <div id="jalonsContainer"></div>
+            </div>
+
+            <!-- ====== ONGLET 4 : LIVRABLES ====== -->
+            <div id="tab-deliverables" class="tab-content">
+                <div style="display:flex; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+                    <div class="filters-row" id="delivFilters"></div>
+                    <button class="btn btn-primary" id="btnDeposit"><i class="fas fa-plus"></i> Déposer un livrable</button>
+                </div>
+                <div id="delivContainer"></div>
+            </div>
+
+            <!-- ====== ONGLET 5 : CHAT ====== -->
+            <div id="tab-chat" class="tab-content">
+                <div class="chat-layout">
+                    <div class="chat-participants">
+                        <h3>Participants (<span id="participantsCount">0</span>)</h3>
+                        <div class="help">💬 Visible par tout le groupe + l'encadrant. Aucune messagerie privée.</div>
+                        <div id="participantsList"></div>
+                    </div>
+                    <div class="chat-thread">
+                        <div class="chat-header">
+                            <h3>💬 Chat collectif du groupe</h3>
+                            <p>Tous les échanges sont publics au sein du groupe.</p>
+                        </div>
+                        <div class="chat-messages" id="chatMessages"></div>
+                        <div class="chat-composer">
+                            <textarea id="chatInput" placeholder="Écrivez un message au groupe… (visible par tous les membres et l'encadrant)"></textarea>
+                            <div class="chat-composer-bottom">
+                                <div class="icons"><i class="fas fa-paperclip"></i><i class="far fa-smile"></i></div>
+                                <button class="btn btn-primary" id="btnSendMsg"><i class="fas fa-paper-plane"></i> Envoyer</button>
+                            </div>
+                            <div class="chat-composer-help">💡 Tous vos messages sont visibles par les membres du groupe et l'encadrant.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== ONGLET 6 : ÉVALUATION ====== -->
+            <div id="tab-evaluation" class="tab-content">
+                <div id="evaluationContent"><div class="empty-state">Chargement…</div></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ====== MODALE : NOUVELLE TÂCHE (Team Leader) ====== -->
+    <div class="modal-overlay" id="taskModal">
+        <div class="modal">
+            <div class="modal-head"><h3>Nouvelle tâche</h3><button class="close-x" data-close="taskModal">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>Titre</label><input class="form-control" id="taskTitle" /></div>
+                <div class="form-group"><label>Description</label><textarea class="form-control" id="taskDesc" rows="2"></textarea></div>
+                <div class="form-group"><label>Date limite *</label><input type="date" class="form-control" id="taskDate" /></div>
+                <div class="form-group"><label>Priorité</label>
+                    <select class="form-control" id="taskPrio">
+                        <option value="Haute">Haute</option>
+                        <option value="Moyenne" selected>Moyenne</option>
+                        <option value="Basse">Basse</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Assigner à (membres du groupe)</label><div class="assignees-list" id="taskAssignees"></div></div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" data-close="taskModal">Annuler</button>
+                <button class="btn btn-primary" id="taskSubmit">Créer la tâche</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== MODALE : DÉPOSER UN LIVRABLE ====== -->
+    <div class="modal-overlay" id="depositModal">
+        <div class="modal">
+            <div class="modal-head"><h3>Déposer un livrable</h3><button class="close-x" data-close="depositModal">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>Fichier</label><input type="file" class="form-control" id="depFile" /></div>
+                <div class="form-group"><label>Nom (optionnel)</label><input class="form-control" id="depName" placeholder="Vide = nom du fichier" /></div>
+                <div class="form-group"><label>Rattacher à</label><select class="form-control" id="depTarget"></select></div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" data-close="depositModal">Annuler</button>
+                <button class="btn btn-primary" id="depSubmit">Déposer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="sidebar.js"></script>
+    <script>
+    /* ============================================================
+       project.html — version dynamique branchée sur /api/etudiant
+       --------------------------------------------------------------
+       Champs attendus depuis l'API (à vérifier avec ton SQL) :
+         GET /projects/:id  -> { project:{nom,etat,date_debut,date_fin,
+                                  encadrant_nom,encadrant_prenom},
+                                 group:{id_groupe,nom,etat,sujet_titre,
+                                  sujet_description},
+                                 isTeamLeader, members:[{id_utilisateur,
+                                  nom,prenom,email,est_team_leader}] }
+         GET /groups/:g/milestones -> { rows:[{id_jalon,titre,description,
+                                  date_limite,id_tache,tache_titre,statut,
+                                  priorite,tache_date}], isTeamLeader }
+         GET /groups/:g/deliverables -> { deliverables:[{id_livrable,nom,
+                                  statut_validation,date_depot,id_tache,
+                                  id_groupe,deposant_nom,deposant_prenom,
+                                  tache_titre,commentaire_validation?}] }
+         GET /groups/:g/messages -> { messages:[{id_message,contenu,
+                                  date_envoi,id_utilisateur,nom,prenom,
+                                  est_encadrant}] }
+         GET /profile -> { utilisateur:{id_utilisateur,...} }
+    ============================================================ */
+
+    renderSidebar("projects");
+
+    const API = "/api/etudiant";
+    const projectId = new URLSearchParams(location.search).get("id");
+
+    const state = {
+        project: null, group: null, members: [], isTeamLeader: false,
+        myUserId: null, groupId: null,
+        jalons: [], tasks: [],
+        deliverables: [], delivValid: 0, delivTotal: 0,
+        taskFilter: "all", taskJalonId: null
+    };
+
+    /* ---------- Constantes d'affichage (enums de la doc) ---------- */
+    const STATUTS = { A_faire: "À faire", En_cours: "En cours", Terminee: "Terminé" };
+    const PRIO_CLASS = { Haute: "priority-haute", Moyenne: "priority-moyenne", Basse: "priority-basse" };
+    const VALID_BADGE = {
+        En_attente: ["badge-warning", "fa-clock", "En attente"],
+        Valide:     ["badge-success", "fa-check-circle", "Validé"],
+        Refuse:     ["badge-danger",  "fa-times-circle", "Refusé"]
+    };
+    const ETAT_BADGE = {
+        Propose: "badge-gray", En_cours: "badge-info", En_retard: "badge-warning",
+        Livre: "badge-success", Soutenu: "badge-success", Cloture: "badge-gray"
+    };
+
+    /* ---------- Utilitaires ---------- */
+    function esc(s) {
+        if (s == null) return "";
+        return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    }
+    function initials(p, n) { return ((p ? p[0] : "") + (n ? n[0] : "")).toUpperCase(); }
+    function fmtDate(d) {
+        if (!d) return "—";
+        return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+    }
+    function fmtShort(d) {
+        if (!d) return "";
+        return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    }
+    function fmtTime(d) {
+        if (!d) return "";
+        return new Date(d).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    }
+    function daysFromNow(d) { return Math.ceil((new Date(d) - new Date()) / 86400000); }
+
+    async function api(method, path, body, isForm) {
+        const opt = { method, credentials: "include", headers: {} };
+        if (body && !isForm) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+        if (body && isForm) { opt.body = body; }
+        const res = await fetch(API + path, opt);
+        if (res.status === 401) { location.href = "login.html"; throw new Error("unauthenticated"); }
+        let data = null;
+        try { data = await res.json(); } catch (e) { /* réponse sans corps */ }
+        return { ok: res.ok, status: res.status, data };
+    }
+
+    /* ---------- Onglets ---------- */
+    function switchTab(tabName, btn) {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + tabName).classList.add("active");
+    }
+
+    /* ---------- Rôle Team Leader vs Membre (piloté par le backend) ---------- */
+    function applyRole(isTL) {
+        document.querySelectorAll("[data-tl-only]").forEach(el => { el.style.display = isTL ? "" : "none"; });
+    }
+
+    /* ---------- Modales ---------- */
+    function openModal(id) { document.getElementById(id).classList.add("open"); }
+    function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+    document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeModal(b.dataset.close));
+    document.querySelectorAll(".modal-overlay").forEach(o => o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); }));
+
+    /* ============================================================
+       HEADER + SUJET
+    ============================================================ */
+    function renderHeader() {
+        const { project, group, members } = state;
+        document.getElementById("breadcrumb").textContent =
+            "Mes projets › " + project.nom + (group.nom ? " › " + group.nom : "");
+        const avatars = members.map(m =>
+            `<div class="member-avatar ${m.est_team_leader ? "has-crown" : ""}" title="${esc(m.prenom)} ${esc(m.nom)}${m.est_team_leader ? " (Team Leader)" : ""}">${esc(initials(m.prenom, m.nom))}</div>`
+        ).join("");
+        const etatCls = ETAT_BADGE[group.etat] || "badge-gray";
+        document.getElementById("projectHeader").innerHTML = `
+            <div class="project-header-top">
+                <div>
+                    <div class="project-title-row">
+                        <h2>${esc(project.nom)}${group.nom ? " — " + esc(group.nom) : ""}</h2>
+                        <span class="badge ${etatCls}">${esc((group.etat || "").replace(/_/g, " "))}</span>
+                    </div>
+                    <div class="project-meta-row">
+                        <div><i class="fas fa-calendar"></i>Soutenance : ${fmtDate(project.date_fin)}</div>
+                        <div><i class="fas fa-user-tie"></i>Encadrant : ${esc(project.encadrant_prenom || "")} ${esc(project.encadrant_nom || "")}</div>
+                    </div>
+                </div>
+                <div class="members-stack">
+                    <div class="members-avatars">${avatars}</div>
+                    <span class="members-count">${members.length} membre${members.length > 1 ? "s" : ""}</span>
+                </div>
+            </div>`;
+    }
+
+    function renderSubject() {
+        const g = state.group;
+        const card = (g && g.sujet_titre) ? `
+            <div class="card">
+                <div class="card-title">Sujet choisi : ${esc(g.sujet_titre)}</div>
+                <p style="color:var(--gray-700); font-size:0.88rem; line-height:1.6;">${esc(g.sujet_description || "Aucune description fournie.")}</p>
+            </div>` : `
+            <div class="card"><div class="empty-state">Aucun sujet choisi pour ce groupe pour le moment.</div></div>`;
+        document.getElementById("subjectContent").innerHTML = card + `<div id="subjectDocs"></div>`;
+    }
+
+    // Documents de consignes déposés par l'encadrant
+    async function loadSubjectDocuments() {
+        const c = document.getElementById("subjectDocs");
+        if (!c) return;
+        const { ok, data } = await api("GET", `/groups/${state.groupId}/subject-documents`);
+        if (!ok) { c.innerHTML = ""; return; }
+        const docs = data.documents || [];
+        if (!docs.length) {
+            c.innerHTML = `<div class="card"><div class="empty-state">Aucun document de consignes déposé par l'encadrant.</div></div>`;
+            return;
+        }
+        c.innerHTML = `<div class="card">
+            <div class="card-title">Documents de consignes</div>
+            ${docs.map(d => `
+                <div class="doc-item">
+                    <div class="doc-icon"><i class="fas fa-file-alt"></i></div>
+                    <div class="doc-info">
+                        <div class="doc-name">${esc(d.nom_fichier)}</div>
+                        <div class="doc-meta">Ajouté le ${fmtDate(d.date_upload)}</div>
+                    </div>
+                    <a class="btn btn-secondary" href="/uploads/${esc(d.chemin_fichier)}" target="_blank"><i class="fas fa-download"></i> Ouvrir</a>
+                </div>`).join("")}
+        </div>`;
+    }
+
+    // Évaluation finale (lecture seule)
+    async function loadEvaluation() {
+        const c = document.getElementById("evaluationContent");
+        if (!c) return;
+        const { ok, data } = await api("GET", `/groups/${state.groupId}/evaluation`);
+        if (!ok) { c.innerHTML = `<div class="card"><div class="empty-state">Erreur de chargement.</div></div>`; return; }
+        const ev = data.evaluation;
+        if (!ev) {
+            c.innerHTML = `<div class="card">
+                <div class="card-title">Évaluation finale</div>
+                <p style="color:var(--gray-600); font-size:0.85rem;"><i class="fas fa-info-circle"></i> Pas encore d'évaluation. L'encadrant la saisira après la soutenance.</p>
+            </div>`;
+            return;
+        }
+        const crits = data.criteres || [];
+        const note = ev.note_finale != null ? Number(ev.note_finale) : null;
+        const critsHtml = crits.length ? `
+            <table class="eval-table">
+                <thead><tr><th>Critère</th><th>Pondération</th><th>Note</th></tr></thead>
+                <tbody>${crits.map(cr => `<tr>
+                    <td>${esc(cr.nom)}</td>
+                    <td>${Number(cr.ponderation)}</td>
+                    <td>${Number(cr.note)}</td>
+                </tr>`).join("")}</tbody>
+            </table>` : `<div class="empty-state">Aucune note par critère.</div>`;
+        c.innerHTML = `
+            <div class="card">
+                <div class="card-title">Évaluation finale</div>
+                <div class="eval-note-label">Note finale</div>
+                <div class="eval-note-big">${note != null ? note : "—"}</div>
+                ${ev.commentaire_global ? `<p style="color:var(--gray-700); font-size:0.88rem; margin-top:0.5rem;">${esc(ev.commentaire_global)}</p>` : ""}
+                <div class="eval-meta">Évalué le ${fmtDate(ev.date_evaluation)}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Détail par critère</div>
+                ${critsHtml}
+            </div>`;
+    }
+
+    /* ============================================================
+       JALONS & TÂCHES
+    ============================================================ */
+    async function loadMilestones() {
+        const { ok, data } = await api("GET", `/groups/${state.groupId}/milestones`);
+        if (!ok) return;
+        const map = new Map();
+        (data.rows || []).forEach(r => {
+            if (!map.has(r.id_jalon)) {
+                map.set(r.id_jalon, { id_jalon: r.id_jalon, titre: r.titre, description: r.description, date_limite: r.date_limite, tasks: [] });
+            }
+            if (r.id_tache) {
+                map.get(r.id_jalon).tasks.push({
+                    id_tache: r.id_tache, titre: r.tache_titre, statut: r.statut,
+                    priorite: r.priorite, date: r.tache_date,
+                    assignes: r.assignes ? String(r.assignes).split(",").map(Number) : []
+                });
+            }
+        });
+        state.jalons = [...map.values()];
+        state.tasks = state.jalons.flatMap(j => j.tasks);
+        renderJalons();
+        refreshOverview();
+    }
+
+    function renderJalons() {
+        const c = document.getElementById("jalonsContainer");
+        if (!state.jalons.length) {
+            c.innerHTML = `<div class="empty-state">Aucun jalon pour l'instant.${state.isTeamLeader ? " Cliquez sur « Nouveau jalon » pour démarrer." : ""}</div>`;
+            return;
+        }
+        const f = state.taskFilter;
+        c.innerHTML = state.jalons.map(j => {
+            const total = j.tasks.length;
+            const done = j.tasks.filter(t => t.statut === "Terminee").length;
+            const pct = total ? Math.round(done / total * 100) : 0;
+            const visibleTasks = j.tasks.filter(t => f === "all" || t.statut === f);
+            const tasksHtml = visibleTasks.map(t => {
+                const late = t.date && new Date(t.date) < new Date() && t.statut !== "Terminee";
+                const opts = Object.keys(STATUTS).map(s => `<option value="${s}" ${t.statut === s ? "selected" : ""}>${STATUTS[s]}</option>`).join("");
+                const assigneesHtml = (t.assignes || []).map(id => {
+                    const m = state.members.find(x => String(x.id_utilisateur) === String(id));
+                    const ini = m ? initials(m.prenom, m.nom) : "?";
+                    const nm = m ? (m.prenom + " " + m.nom) : ("#" + id);
+                    return `<div class="assignee-avatar" title="${esc(nm)}">${esc(ini)}</div>`;
+                }).join("");
+                return `<div class="task-row">
+                    <div class="priority ${PRIO_CLASS[t.priorite] || ""}" title="Priorité ${esc(t.priorite || "")}"></div>
+                    <div class="name ${t.statut === "Terminee" ? "done" : ""}">${esc(t.titre)}</div>
+                    <select class="status-select" data-task="${t.id_tache}" data-prev="${t.statut}">${opts}</select>
+                    <div class="assignees">${assigneesHtml}</div>
+                    <span class="date ${late ? "late" : ""}">${t.date ? fmtShort(t.date) : ""}${late ? " (En retard)" : ""}</span>
+                    <button class="icon-btn" title="Commenter" data-comment-task="${t.id_tache}"><i class="fas fa-comment"></i></button>
+                    <button class="icon-btn" title="Déposer un livrable" data-deposit-task="${t.id_tache}"><i class="fas fa-paperclip"></i></button>
+                </div>`;
+            }).join("") || `<div class="empty-state" style="padding:0.75rem;">Aucune tâche${f !== "all" ? " pour ce filtre" : ""}.</div>`;
+            return `<div class="jalon-card">
+                <div class="jalon-header">
+                    <div class="jalon-chevron"><i class="fas fa-chevron-down"></i></div>
+                    <div>
+                        <div class="jalon-title">${esc(j.titre)}</div>
+                        <div class="jalon-subtitle"><i class="fas fa-calendar"></i> Échéance : ${fmtDate(j.date_limite)} · ${pct}% · ${total} tâche${total > 1 ? "s" : ""}</div>
+                    </div>
+                    <div class="jalon-progress">
+                        <div class="jalon-progress-bar"><div class="jalon-progress-fill" style="width:${pct}%"></div></div>
+                        <span class="jalon-progress-value">${pct}%</span>
+                    </div>
+                    <div class="jalon-actions" data-tl-only>
+                        <button class="icon-btn" title="Modifier" data-edit-jalon="${j.id_jalon}"><i class="fas fa-pen"></i></button>
+                        <button class="icon-btn danger" title="Supprimer" data-del-jalon="${j.id_jalon}"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-primary" style="padding:0.4rem 0.75rem; font-size:0.78rem;" data-new-task="${j.id_jalon}"><i class="fas fa-plus"></i> Nouvelle tâche</button>
+                    </div>
+                </div>
+                <div class="jalon-tasks">${tasksHtml}</div>
+            </div>`;
+        }).join("");
+        applyRole(state.isTeamLeader); // les .jalon-actions viennent d'être recréées
+        attachJalonHandlers();
+    }
+
+    function attachJalonHandlers() {
+        document.querySelectorAll(".status-select").forEach(sel => {
+            sel.addEventListener("change", async () => {
+                const id = sel.dataset.task, prev = sel.dataset.prev, val = sel.value;
+                const { ok, status } = await api("PATCH", `/tasks/${id}/status`, { statut: val });
+                if (ok) { sel.dataset.prev = val; loadMilestones(); }
+                else {
+                    sel.value = prev;
+                    alert(status === 403 ? "Action réservée à un assigné de la tâche ou au Team Leader du groupe." : "Erreur lors du changement de statut.");
+                }
+            });
+        });
+        document.querySelectorAll("[data-edit-jalon]").forEach(b => b.onclick = () => editJalon(b.dataset.editJalon));
+        document.querySelectorAll("[data-del-jalon]").forEach(b => b.onclick = () => delJalon(b.dataset.delJalon));
+        document.querySelectorAll("[data-new-task]").forEach(b => b.onclick = () => openTaskModal(b.dataset.newTask));
+        document.querySelectorAll("[data-comment-task]").forEach(b => b.onclick = () => commentTask(b.dataset.commentTask));
+        document.querySelectorAll("[data-deposit-task]").forEach(b => b.onclick = () => openDepositModal(b.dataset.depositTask, null));
+    }
+
+    function newJalon() {
+        const titre = prompt("Titre du nouveau jalon :");
+        if (!titre) return;
+        const description = prompt("Description (optionnel) :") || "";
+        const date_limite = prompt("Date limite (AAAA-MM-JJ) :");
+        if (!date_limite) return;
+        api("POST", `/groups/${state.groupId}/milestones`, { titre, description, date_limite })
+            .then(r => r.ok ? loadMilestones() : alert(r.status === 403 ? "Action réservée au Team Leader." : "Erreur."));
+    }
+    function editJalon(id) {
+        const j = state.jalons.find(x => String(x.id_jalon) === String(id));
+        if (!j) return;
+        const titre = prompt("Titre du jalon :", j.titre); if (titre === null) return;
+        const description = prompt("Description :", j.description || ""); if (description === null) return;
+        const date_limite = prompt("Date limite (AAAA-MM-JJ) :", (j.date_limite || "").slice(0, 10)); if (date_limite === null) return;
+        api("PUT", `/milestones/${id}`, { titre, description, date_limite })
+            .then(r => r.ok ? loadMilestones() : alert(r.status === 403 ? "Action réservée au Team Leader." : "Erreur."));
+    }
+    function delJalon(id) {
+        if (!confirm("Supprimer ce jalon et toutes ses tâches ?")) return;
+        api("DELETE", `/milestones/${id}`)
+            .then(r => r.ok ? loadMilestones() : alert(r.status === 403 ? "Action réservée au Team Leader." : "Erreur."));
+    }
+
+    /* --- Modale nouvelle tâche --- */
+    function openTaskModal(jalonId) {
+        state.taskJalonId = jalonId;
+        document.getElementById("taskTitle").value = "";
+        document.getElementById("taskDesc").value = "";
+        document.getElementById("taskDate").value = "";
+        document.getElementById("taskPrio").value = "Moyenne";
+        document.getElementById("taskAssignees").innerHTML = state.members.map(m =>
+            `<label><input type="checkbox" value="${m.id_utilisateur}"> ${esc(m.prenom)} ${esc(m.nom)}${m.est_team_leader ? " 👑" : ""}</label>`
+        ).join("");
+        openModal("taskModal");
+    }
+    document.getElementById("taskSubmit").onclick = async () => {
+        const titre = document.getElementById("taskTitle").value.trim();
+        if (!titre) { alert("Le titre est requis."); return; }
+        const description = document.getElementById("taskDesc").value.trim();
+        const date_limite = document.getElementById("taskDate").value;
+        if (!date_limite) { alert("La date limite est requise."); return; }
+        const priorite = document.getElementById("taskPrio").value;
+        const assignees = [...document.querySelectorAll("#taskAssignees input:checked")].map(i => Number(i.value));
+        const { ok, status } = await api("POST", `/milestones/${state.taskJalonId}/tasks`, { titre, description, date_limite, priorite, assignees });
+        if (ok) { closeModal("taskModal"); loadMilestones(); }
+        else alert(status === 403 ? "Action réservée au Team Leader." : (status === 400 ? "Tous les assignés doivent être membres du groupe." : "Erreur lors de la création."));
+    };
+
+    async function commentTask(id) {
+        const contenu = prompt("Votre commentaire sur la tâche :");
+        if (!contenu) return;
+        const { ok, status } = await api("POST", `/tasks/${id}/comments`, { contenu });
+        alert(ok ? "Commentaire ajouté." : (status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur."));
+    }
+
+    /* ============================================================
+       VUE D'ENSEMBLE (stats calculées)
+    ============================================================ */
+    function refreshOverview() {
+        const all = state.tasks;
+        const total = all.length;
+        const done = all.filter(t => t.statut === "Terminee").length;
+        const pct = total ? Math.round(done / total * 100) : 0;
+
+        const deadlines = [];
+        state.jalons.forEach(j => {
+            if (j.date_limite) deadlines.push({ type: "Jalon", name: j.titre, date: j.date_limite, cls: "jalon", icon: "fa-flag", badge: "badge-primary" });
+            j.tasks.forEach(t => { if (t.date && t.statut !== "Terminee") deadlines.push({ type: "Tâche", name: t.titre, date: t.date, cls: "tache", icon: "fa-check", badge: "badge-info" }); });
+        });
+        const future = deadlines.filter(d => new Date(d.date) >= new Date()).sort((a, b) => new Date(a.date) - new Date(b.date));
+        const next = future[0];
+        const nextLabel = next ? (daysFromNow(next.date) <= 0 ? "Aujourd'hui" : "Dans " + daysFromNow(next.date) + " j") : "—";
+
+        document.getElementById("overviewStats").innerHTML = `
+            <div class="stat-card"><div class="stat-label">Progression globale</div><div class="stat-value">${pct}%</div></div>
+            <div class="stat-card"><div class="stat-label">Tâches terminées</div><div class="stat-value">${done}/${total}</div></div>
+            <div class="stat-card"><div class="stat-label">Livrables validés</div><div class="stat-value">${state.delivValid}/${state.delivTotal}</div></div>
+            <div class="stat-card"><div class="stat-label">Prochaine échéance</div><div class="stat-value" style="font-size:1rem;">${nextLabel}</div></div>`;
+
+        document.getElementById("overviewAlert").innerHTML = next ? `
+            <div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i>
+            <div><strong>Échéance proche :</strong> « ${esc(next.name)} » (${next.type.toLowerCase()}) ${daysFromNow(next.date) <= 0 ? "aujourd'hui" : "dans " + daysFromNow(next.date) + " jour(s)"}.</div></div>` : "";
+
+        document.getElementById("overviewDeadlines").innerHTML = future.slice(0, 5).map(d => `
+            <div class="deadline-item">
+                <div class="deadline-icon ${d.cls}"><i class="fas ${d.icon}"></i></div>
+                <div class="deadline-info"><div class="name">${esc(d.name)}</div><div class="type">${d.type}</div></div>
+                <span class="deadline-date">${fmtShort(d.date)}</span>
+                <span class="badge ${d.badge}">${d.type}</span>
+            </div>`).join("") || `<div class="empty-state">Aucune échéance à venir.</div>`;
+    }
+
+    /* ============================================================
+       LIVRABLES
+    ============================================================ */
+    async function loadDeliverables() {
+        const { ok, data } = await api("GET", `/groups/${state.groupId}/deliverables`);
+        if (!ok) return;
+        state.deliverables = data.deliverables || [];
+        state.delivTotal = state.deliverables.length;
+        state.delivValid = state.deliverables.filter(d => d.statut_validation === "Valide").length;
+        renderDeliverables("all");
+        refreshOverview();
+    }
+
+    function renderDeliverables(filter) {
+        const list = state.deliverables;
+        const counts = {
+            all: list.length,
+            En_attente: list.filter(d => d.statut_validation === "En_attente").length,
+            Valide: list.filter(d => d.statut_validation === "Valide").length,
+            Refuse: list.filter(d => d.statut_validation === "Refuse").length
+        };
+        document.getElementById("delivFilters").innerHTML = `
+            <button class="filter-chip ${filter === "all" ? "active" : ""}" data-filter="all">Tous (${counts.all})</button>
+            <button class="filter-chip ${filter === "En_attente" ? "active" : ""}" data-filter="En_attente">En attente (${counts.En_attente})</button>
+            <button class="filter-chip ${filter === "Valide" ? "active" : ""}" data-filter="Valide">Validés (${counts.Valide})</button>
+            <button class="filter-chip ${filter === "Refuse" ? "active" : ""}" data-filter="Refuse">Refusés (${counts.Refuse})</button>`;
+        document.querySelectorAll("#delivFilters .filter-chip").forEach(c => c.onclick = () => renderDeliverables(c.dataset.filter));
+
+        const keep = d => filter === "all" || d.statut_validation === filter;
+        const card = d => {
+            const meta = VALID_BADGE[d.statut_validation] || ["badge-gray", "fa-file", d.statut_validation || ""];
+            const refused = d.statut_validation === "Refuse" ? `
+                <div class="deliv-refused-block">
+                    <div class="refused-text">
+                        <strong><i class="fas fa-exclamation-triangle"></i> À corriger par le groupe</strong>
+                        <p>${esc(d.commentaire_validation || "Aucun commentaire de l'encadrant.")}</p>
+                    </div>
+                    <button class="btn-redeposer" data-redep-task="${d.id_tache || ""}" data-redep-group="${d.id_groupe || ""}"><i class="fas fa-redo"></i> Redéposer</button>
+                </div>` : "";
+            return `<div>
+                <div class="deliv-card ${d.statut_validation === "Refuse" ? "refused" : ""}">
+                    <div class="deliv-icon"><i class="fas fa-file"></i></div>
+                    <div class="deliv-info">
+                        <div class="name">${esc(d.nom)}</div>
+                        <div class="meta">Déposé par ${esc(d.deposant_prenom || "")} ${esc(d.deposant_nom || "")}${d.tache_titre ? " · Tâche : " + esc(d.tache_titre) : " · Groupe global"} · ${fmtDate(d.date_depot)}</div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <span class="badge ${meta[0]}"><i class="fas ${meta[1]}"></i> ${meta[2]}</span>
+                        <button class="icon-btn" title="Commenter" data-comment-deliv="${d.id_livrable}"><i class="fas fa-comment"></i></button>
+                    </div>
+                </div>${refused}
+            </div>`;
+        };
+        const byTask = list.filter(d => d.id_tache && keep(d)).map(card).join("") || `<div class="empty-state">Aucun livrable de tâche.</div>`;
+        const byGroup = list.filter(d => d.id_groupe && keep(d)).map(card).join("") || `<div class="empty-state">Aucun livrable final de groupe.</div>`;
+        document.getElementById("delivContainer").innerHTML = `
+            <div class="deliv-section">
+                <div class="deliv-section-title">Livrables par tâche</div>
+                <div class="deliv-section-help">Rattachés à des tâches spécifiques du projet.</div>
+                ${byTask}
+            </div>
+            <div class="deliv-section">
+                <div class="deliv-section-title">Livrables finaux du groupe</div>
+                <div class="deliv-section-help">Doivent tous être validés par l'encadrant pour passer à « Livré ».</div>
+                ${byGroup}
+            </div>`;
+        document.querySelectorAll("[data-comment-deliv]").forEach(b => b.onclick = () => commentDeliv(b.dataset.commentDeliv));
+        document.querySelectorAll("[data-redep-task]").forEach(b => b.onclick = () => openDepositModal(b.dataset.redepTask || null, b.dataset.redepGroup || null));
+    }
+
+    async function commentDeliv(id) {
+        const contenu = prompt("Votre commentaire sur le livrable :");
+        if (!contenu) return;
+        const { ok, status } = await api("POST", `/deliverables/${id}/comments`, { contenu });
+        alert(ok ? "Commentaire ajouté." : (status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur."));
+    }
+
+    /* --- Modale dépôt de livrable --- */
+    function buildTargetOptions(selected) {
+        let opts = `<option value="group" ${selected === "group" ? "selected" : ""}>Groupe global (livrable final)</option>`;
+        state.tasks.forEach(t => {
+            const v = "task:" + t.id_tache;
+            opts += `<option value="${v}" ${selected === v ? "selected" : ""}>Tâche : ${esc(t.titre)}</option>`;
+        });
+        return opts;
+    }
+    function openDepositModal(taskId, groupId) {
+        const sel = taskId ? "task:" + taskId : "group";
+        document.getElementById("depTarget").innerHTML = buildTargetOptions(sel);
+        document.getElementById("depFile").value = "";
+        document.getElementById("depName").value = "";
+        openModal("depositModal");
+    }
+    document.getElementById("depSubmit").onclick = async () => {
+        const file = document.getElementById("depFile").files[0];
+        if (!file) { alert("Sélectionnez un fichier."); return; }
+        const target = document.getElementById("depTarget").value;
+        const fd = new FormData();
+        fd.append("fichier", file);
+        const nom = document.getElementById("depName").value.trim();
+        if (nom) fd.append("nom", nom);
+        if (target === "group") fd.append("id_groupe", state.groupId);
+        else fd.append("id_tache", target.split(":")[1]);
+        const { ok, status } = await api("POST", "/deliverables", fd, true);
+        if (ok) { closeModal("depositModal"); loadDeliverables(); }
+        else alert(status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur lors du dépôt.");
+    };
+
+    /* ============================================================
+       CHAT
+    ============================================================ */
+    async function loadChat() {
+        const { ok, data } = await api("GET", `/groups/${state.groupId}/messages`);
+        if (!ok) return;
+        renderParticipants();
+        renderMessages(data.messages || []);
+    }
+    function renderParticipants() {
+        const membersHtml = state.members.map(u => `
+            <div class="participant">
+                <div class="participant-avatar ${u.est_team_leader ? "has-crown" : ""}">${esc(initials(u.prenom, u.nom))}</div>
+                <div class="participant-info">
+                    <div class="participant-name">${esc(u.prenom)} ${esc(u.nom)}${String(u.id_utilisateur) === String(state.myUserId) ? " (Vous)" : ""}</div>
+                    <div class="participant-status"><span class="badge ${u.est_team_leader ? "badge-primary" : "badge-gray"}" style="font-size:0.6rem; padding:1px 5px;">${u.est_team_leader ? "Team Leader" : "Membre"}</span></div>
+                </div>
+            </div>`).join("");
+        const enc = state.project ? `
+            <div class="participant">
+                <div class="participant-avatar">${esc(initials(state.project.encadrant_prenom, state.project.encadrant_nom))}</div>
+                <div class="participant-info">
+                    <div class="participant-name">${esc(state.project.encadrant_prenom || "")} ${esc(state.project.encadrant_nom || "")}</div>
+                    <div class="participant-status"><span class="badge badge-info" style="font-size:0.6rem; padding:1px 5px;">Encadrant</span></div>
+                </div>
+            </div>` : "";
+        document.getElementById("participantsList").innerHTML = membersHtml + enc;
+        document.getElementById("participantsCount").textContent = state.members.length + (state.project ? 1 : 0);
+    }
+    function renderMessages(msgs) {
+        const c = document.getElementById("chatMessages");
+        c.innerHTML = msgs.map(m => {
+            const me = String(m.id_utilisateur) === String(state.myUserId);
+            const isEnc = !!m.est_encadrant;
+            const badge = isEnc ? "badge-info" : (me ? "badge-primary" : "badge-gray");
+            const role = isEnc ? "Encadrant" : (me ? "Team Leader / Vous" : "Membre");
+            return `<div class="chat-message ${me ? "me" : ""}">
+                <div class="chat-msg-avatar">${esc(initials(m.prenom, m.nom))}</div>
+                <div class="chat-bubble-wrap">
+                    <div class="chat-bubble-header"><strong>${esc(m.prenom)} ${esc(m.nom)}</strong> · <span class="badge ${badge}" style="font-size:0.6rem; padding:1px 5px;">${role}</span> · ${fmtTime(m.date_envoi)}</div>
+                    <div class="chat-bubble">${esc(m.contenu)}</div>
+                </div>
+            </div>`;
+        }).join("") || `<div class="empty-state">Aucun message. Démarrez la conversation !</div>`;
+        c.scrollTop = c.scrollHeight;
+    }
+    async function sendMessage() {
+        const ta = document.getElementById("chatInput");
+        const contenu = ta.value.trim();
+        if (!contenu) return;
+        const { ok } = await api("POST", `/groups/${state.groupId}/messages`, { contenu });
+        if (ok) { ta.value = ""; loadChat(); }
+        else alert("Erreur lors de l'envoi.");
+    }
+
+    /* ============================================================
+       ACTIVITÉ RÉCENTE (onglet Vue d'ensemble)
+    ============================================================ */
+    function truncate(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
+
+    function renderActivityItem(a) {
+        const name = esc(((a.prenom || "") + " " + (a.nom || "")).trim());
+        let iconCls = "info", icon = "fa-bell", text = "";
+        if (a.type === "livrable") {
+            if (a.extra === "Valide")      { iconCls = "success"; icon = "fa-check-circle"; text = `Livrable « ${esc(a.label)} » validé`; }
+            else if (a.extra === "Refuse") { iconCls = "danger";  icon = "fa-times-circle"; text = `Livrable « ${esc(a.label)} » refusé`; }
+            else                           { iconCls = "info";    icon = "fa-file-arrow-up"; text = `<strong>${name}</strong> a déposé « ${esc(a.label)} »`; }
+        } else if (a.type === "message") {
+            iconCls = "info"; icon = "fa-comments";
+            text = `<strong>${name}</strong> a écrit : « ${esc(truncate(a.label, 60))} »`;
+        }
+        return `
+            <div class="activity-item">
+                <div class="activity-icon ${iconCls}"><i class="fas ${icon}"></i></div>
+                <div class="activity-content">
+                    <div class="activity-text">${text}</div>
+                    <div class="activity-time">${fmtTime(a.date_evt)}</div>
+                </div>
+            </div>`;
+    }
+
+    async function loadOverviewActivity() {
+        const c = document.getElementById("overviewActivity");
+        if (!c) return;
+        const { ok, data } = await api("GET", `/activity?groupId=${state.groupId}`);
+        if (!ok) { c.innerHTML = `<div class="empty-state">Erreur de chargement.</div>`; return; }
+        const list = data.activity || [];
+        c.innerHTML = list.length ? list.map(renderActivityItem).join("") : `<div class="empty-state">Aucune activité récente.</div>`;
+    }
+
+    /* ============================================================
+       INITIALISATION
+    ============================================================ */
+    function showFatal(msg) {
+        document.getElementById("projectHeader").innerHTML = `<div class="empty-state">${esc(msg)}</div>`;
+    }
+
+    async function init() {
+        if (!projectId) { showFatal("Aucun projet spécifié. Ouvrez cette page via la liste de vos projets (project.html?id=…)."); return; }
+
+        // Mon identifiant (pour repérer mes messages dans le chat)
+        try {
+            const p = await api("GET", "/profile");
+            if (p.ok && p.data && p.data.utilisateur) state.myUserId = p.data.utilisateur.id_utilisateur;
+        } catch (e) { /* non bloquant */ }
+
+        const { ok, status, data } = await api("GET", `/projects/${projectId}`);
+        if (!ok) { showFatal(status === 403 ? "Vous n'êtes pas membre d'un groupe sur ce projet." : "Projet introuvable."); return; }
+
+        state.project = data.project;
+        state.group = data.group;
+        state.members = data.members || [];
+        state.groupId = data.group.id_groupe;
+        state.isTeamLeader = !!data.isTeamLeader;
+
+        applyRole(state.isTeamLeader);
+        renderHeader();
+        renderSubject();
+
+        loadSubjectDocuments();
+        loadEvaluation();
+        loadOverviewActivity();
+        loadMilestones();
+        loadDeliverables();
+        loadChat();
+    }
+
+    // Boutons statiques
+    document.getElementById("btnNewJalon").onclick = newJalon;
+    document.getElementById("btnDeposit").onclick = () => openDepositModal(null, state.groupId);
+    document.getElementById("btnSendMsg").onclick = sendMessage;
+    document.querySelectorAll("#taskFilters .filter-chip").forEach(chip => {
+        chip.onclick = () => {
+            document.querySelectorAll("#taskFilters .filter-chip").forEach(c => c.classList.remove("active"));
+            chip.classList.add("active");
+            state.taskFilter = chip.dataset.tfilter;
+            renderJalons();
+        };
+    });
+
+    init();
+    </script>
+</body>
+</html>

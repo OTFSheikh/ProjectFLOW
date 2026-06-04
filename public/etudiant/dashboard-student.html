@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Tableau de bord étudiant</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        /* Styles spécifiques au dashboard étudiant */
+        .welcome-bar { margin-bottom: 1.5rem; }
+        .welcome-bar p { color: var(--gray-500); font-size: 0.875rem; }
+
+        /* Layout 2 colonnes */
+        .two-columns {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        /* Card header avec lien */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .card-link {
+            font-size: 0.78rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .card-link:hover { text-decoration: underline; }
+
+        /* Tâches */
+        .tasks-list { display: flex; flex-direction: column; }
+        .task-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .task-item:last-child { border-bottom: none; }
+
+        .priority-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .priority-haute { background: var(--danger); }
+        .priority-moyenne { background: var(--warning); }
+        .priority-basse { background: var(--gray-400); }
+
+        .task-info .task-name {
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: var(--gray-900);
+            margin-bottom: 0.15rem;
+        }
+        .task-info .task-breadcrumb {
+            font-size: 0.72rem;
+            color: var(--gray-500);
+        }
+
+        .task-deadline {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            font-weight: 500;
+        }
+        .task-deadline.late { color: var(--danger); font-weight: 600; }
+        .task-deadline.soon { color: var(--warning); font-weight: 600; }
+
+        /* Pill statut */
+        .status-pill {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .status-afaire { background: var(--gray-100); color: var(--gray-600); }
+        .status-encours { background: var(--info-light); color: var(--info); }
+        .status-termine { background: var(--secondary-light); color: var(--secondary); }
+
+        /* Projets */
+        .projects-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .project-card {
+            padding: 0.875rem;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            text-decoration: none;
+            color: inherit;
+            transition: all var(--transition);
+            display: block;
+        }
+        .project-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+        .project-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.25rem;
+            gap: 0.5rem;
+        }
+        .project-card-name {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+        .project-card-group {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            margin-bottom: 0.5rem;
+        }
+        .project-role {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-bottom: 0.6rem;
+        }
+        .role-leader {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+        }
+        .role-membre {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+
+        /* Barre de progression */
+        .progress-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .progress-bar {
+            flex: 1;
+            height: 5px;
+            background: var(--gray-100);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            border-radius: 5px;
+        }
+        .progress-value {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            min-width: 32px;
+            text-align: right;
+        }
+
+        /* Activité récente */
+        .activity-list { display: flex; flex-direction: column; }
+        .activity-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--gray-100);
+            align-items: flex-start;
+        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        .activity-icon.success { background: var(--secondary-light); color: var(--secondary); }
+        .activity-icon.info { background: var(--info-light); color: var(--info); }
+        .activity-content { flex: 1; }
+        .activity-text {
+            font-size: 0.83rem;
+            color: var(--gray-900);
+            margin-bottom: 0.15rem;
+        }
+        .activity-text strong { font-weight: 600; }
+        .activity-time {
+            font-size: 0.7rem;
+            color: var(--gray-500);
+        }
+
+        /* États vides */
+        .dash-empty {
+            text-align: center;
+            color: var(--gray-500);
+            font-size: 0.82rem;
+            padding: 1.5rem 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Tableau de bord</div>
+                <h1>Bonjour, <span id="userFirstname">…</span> 👋</h1>
+            </div>
+            <div class="topbar-right">
+                <span id="topbarDate"></span>
+            </div>
+        </header>
+
+        <main class="page-content">
+            <div class="welcome-bar">
+                <p>Voici un résumé de votre activité académique aujourd'hui.</p>
+            </div>
+
+            <!-- 4 KPI Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Projets en cours</div>
+                    <div class="stat-value" id="kpiProjects">…</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Tâches à faire</div>
+                    <div class="stat-value" id="kpiTasks">…</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Tâches en retard</div>
+                    <div class="stat-value warning" id="kpiLate">…</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Livrables refusés</div>
+                    <div class="stat-value danger" id="kpiRefused">…</div>
+                </div>
+            </div>
+
+            <!-- 2 colonnes : tâches + projets -->
+            <div class="two-columns">
+                <!-- Colonne gauche : tâches prioritaires -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Mes tâches prioritaires</div>
+                        <a href="/etudiant/projects.html" class="card-link">Voir mes projets →</a>
+                    </div>
+                    <div class="tasks-list" id="tasksList">
+                        <div class="dash-empty">Chargement…</div>
+                    </div>
+                </div>
+
+                <!-- Colonne droite : mes projets -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Mes projets</div>
+                    </div>
+                    <div class="projects-list" id="projectsList">
+                        <div class="dash-empty">Chargement…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activité récente -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Activité récente</div>
+                </div>
+                <div class="activity-list" id="activityList">
+                    <div class="dash-empty">Chargement…</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("dashboard");
+
+        // Date du jour en français
+        const date = new Date();
+        document.getElementById("topbarDate").textContent =
+            date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        const API = "/api/etudiant";
+
+        const ETAT_GROUPE = {
+            Propose:   ["Proposé",   "etat-groupe-propose"],
+            En_cours:  ["En cours",  "etat-groupe-encours"],
+            En_retard: ["En retard", "etat-groupe-enretard"],
+            Livre:     ["Livré",     "etat-groupe-livre"],
+            Soutenu:   ["Soutenu",   "etat-groupe-soutenu"],
+            Cloture:   ["Clôturé",   "etat-groupe-cloture"]
+        };
+
+        function esc(s) {
+            if (s == null) return "";
+            return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch(`${API}/dashboard`, { credentials: "include" });
+                if (!res.ok) return;
+                const d = await res.json();
+                const s = d.stats || {};
+                document.getElementById("kpiProjects").textContent = s.projectsCount ?? 0;
+                document.getElementById("kpiTasks").textContent = s.tasksCount ?? 0;
+                document.getElementById("kpiLate").textContent = s.lateCount ?? 0;
+                document.getElementById("kpiRefused").textContent = s.refusedCount ?? 0;
+            } catch (e) { /* silencieux */ }
+        }
+
+        async function loadProjects() {
+            const c = document.getElementById("projectsList");
+            try {
+                const res = await fetch(`${API}/projects`, { credentials: "include" });
+                if (!res.ok) { c.innerHTML = `<div class="dash-empty">Erreur de chargement.</div>`; return; }
+                const d = await res.json();
+                const list = d.projects || [];
+                if (!list.length) { c.innerHTML = `<div class="dash-empty">Aucun projet pour l'instant.</div>`; return; }
+                c.innerHTML = list.map(p => {
+                    const etat = ETAT_GROUPE[p.etat_groupe] || [esc(p.etat_groupe || "—"), "badge-gray"];
+                    const role = p.est_team_leader
+                        ? `<div class="project-role role-leader"><i class="fas fa-crown"></i> Team Leader</div>`
+                        : `<div class="project-role role-membre"><i class="fas fa-user"></i> Membre</div>`;
+                    return `
+                        <a href="/etudiant/project.html?id=${p.id_projet}" class="project-card">
+                            <div class="project-card-top">
+                                <div class="project-card-name">${esc(p.nom_projet)}</div>
+                                <span class="badge ${etat[1]}">${etat[0]}</span>
+                            </div>
+                            <div class="project-card-group">${esc(p.nom_groupe || "")} · ${p.nb_membres || 0} membre${(p.nb_membres || 0) > 1 ? "s" : ""}</div>
+                            ${role}
+                            <div class="progress-row" title="${p.nb_taches_done || 0}/${p.nb_taches || 0} tâches terminées">
+                                <div class="progress-bar"><div class="progress-fill" style="width:${p.progression || 0}%"></div></div>
+                                <span class="progress-value">${p.progression || 0}%</span>
+                            </div>
+                        </a>`;
+                }).join("");
+            } catch (e) {
+                c.innerHTML = `<div class="dash-empty">Impossible de joindre le serveur.</div>`;
+            }
+        }
+
+        const STATUT_LABEL = {
+            A_faire:  ["À faire",  "status-afaire"],
+            En_cours: ["En cours", "status-encours"],
+            Terminee: ["Terminé",  "status-termine"]
+        };
+        const PRIO_DOT = { Haute: "priority-haute", Moyenne: "priority-moyenne", Basse: "priority-basse" };
+
+        function deadlineInfo(d, statut) {
+            if (!d) return ["", ""];
+            const days = Math.ceil((new Date(d) - new Date()) / 86400000);
+            if (statut === "Terminee") return [new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), ""];
+            if (days < 0) return ["En retard " + Math.abs(days) + "j", "late"];
+            if (days <= 2) return [days === 0 ? "Aujourd'hui" : "Dans " + days + " j", "soon"];
+            return ["Dans " + days + " j", ""];
+        }
+
+        async function loadMyTasks() {
+            const c = document.getElementById("tasksList");
+            try {
+                const res = await fetch(`${API}/tasks/mine`, { credentials: "include" });
+                if (!res.ok) { c.innerHTML = `<div class="dash-empty">Erreur de chargement.</div>`; return; }
+                const d = await res.json();
+                const list = (d.tasks || []).filter(t => t.statut !== "Terminee").slice(0, 6);
+                if (!list.length) { c.innerHTML = `<div class="dash-empty">Aucune tâche en cours 🎉</div>`; return; }
+                c.innerHTML = list.map(t => {
+                    const st = STATUT_LABEL[t.statut] || [esc(t.statut), "status-afaire"];
+                    const dl = deadlineInfo(t.date_limite, t.statut);
+                    return `
+                        <div class="task-item">
+                            <div class="priority-dot ${PRIO_DOT[t.priorite] || ""}"></div>
+                            <div class="task-info">
+                                <div class="task-name">${esc(t.titre)}</div>
+                                <div class="task-breadcrumb">${esc(t.nom_projet)} › ${esc(t.nom_groupe)}</div>
+                            </div>
+                            <span class="task-deadline ${dl[1]}">${dl[0]}</span>
+                            <span class="status-pill ${st[1]}">${st[0]}</span>
+                        </div>`;
+                }).join("");
+            } catch (e) {
+                c.innerHTML = `<div class="dash-empty">Impossible de joindre le serveur.</div>`;
+            }
+        }
+
+        function truncate(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
+
+        function fmtActivityTime(d) {
+            if (!d) return "";
+            return new Date(d).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+        }
+
+        function renderActivityItem(a) {
+            const name = esc(((a.prenom || "") + " " + (a.nom || "")).trim());
+            let iconCls = "info", icon = "fa-bell", text = "";
+            if (a.type === "livrable") {
+                if (a.extra === "Valide")      { iconCls = "success"; icon = "fa-check-circle"; text = `Livrable « ${esc(a.label)} » validé`; }
+                else if (a.extra === "Refuse") { iconCls = "info";    icon = "fa-times-circle"; text = `Livrable « ${esc(a.label)} » refusé`; }
+                else                           { iconCls = "info";    icon = "fa-file-arrow-up"; text = `<strong>${name}</strong> a déposé « ${esc(a.label)} »`; }
+            } else if (a.type === "message") {
+                iconCls = "info"; icon = "fa-comments";
+                text = `<strong>${name}</strong> a écrit dans ${esc(a.nom_groupe || "")} : « ${esc(truncate(a.label, 60))} »`;
+            }
+            return `
+                <div class="activity-item">
+                    <div class="activity-icon ${iconCls}"><i class="fas ${icon}"></i></div>
+                    <div class="activity-content">
+                        <div class="activity-text">${text}</div>
+                        <div class="activity-time">${fmtActivityTime(a.date_evt)}</div>
+                    </div>
+                </div>`;
+        }
+
+        async function loadActivity() {
+            const c = document.getElementById("activityList");
+            try {
+                const res = await fetch(`${API}/activity`, { credentials: "include" });
+                if (!res.ok) { c.innerHTML = `<div class="dash-empty">Erreur de chargement.</div>`; return; }
+                const d = await res.json();
+                const list = d.activity || [];
+                if (!list.length) { c.innerHTML = `<div class="dash-empty">Aucune activité récente.</div>`; return; }
+                c.innerHTML = list.map(renderActivityItem).join("");
+            } catch (e) {
+                c.innerHTML = `<div class="dash-empty">Impossible de joindre le serveur.</div>`;
+            }
+        }
+
+        async function init() {
+            const user = await checkEtudiantAuth(); // sécurise + remplit la sidebar
+            document.getElementById("userFirstname").textContent = user ? esc(user.prenom || "") : "";
+            loadStats();
+            loadProjects();
+            loadMyTasks();
+            loadActivity();
+        }
+
+        init();
+    </script>
+</body>
+</html>

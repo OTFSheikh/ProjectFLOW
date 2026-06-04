@@ -9,6 +9,7 @@ const crypto = require("crypto");
 const { hashPassword, comparePassword } = require("./utils/password");
 const adminRoutes = require("./routes/admin");
 const encadrantRoutes = require("./routes/encadrant");
+const etudiantRoutes = require("./routes/etudiant");
 
 const app = express();
 
@@ -25,9 +26,6 @@ app.use(session({
     }
 }));
 
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
 /*
 ----------------------------------
 Connexion MySQL
@@ -36,10 +34,14 @@ Connexion MySQL
 
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
+    port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME
 });
+
+// Id de l'étudiant utilisé pour la session par défaut (mode "sans connexion")
+let defaultEtudiantId = null;
 
 db.connect((err) => {
     if (err) {
@@ -47,7 +49,43 @@ db.connect((err) => {
         return;
     }
     console.log("MySQL connecté");
+
+    // On résout une fois l'étudiant démo pour la session automatique
+    db.query(
+        "SELECT id_utilisateur FROM Utilisateur WHERE email = 'etu.demo@test.local' LIMIT 1",
+        (e, r) => {
+            if (!e && r.length) {
+                defaultEtudiantId = r[0].id_utilisateur;
+                console.log("Session étudiant par défaut active (id =", defaultEtudiantId + ")");
+            } else {
+                console.warn("Étudiant démo introuvable — lance le SQL de seed (etu.demo@test.local).");
+            }
+        }
+    );
 });
+
+/*
+----------------------------------
+MODE SANS CONNEXION (DEV)
+Injecte automatiquement une session étudiant si aucune session active.
+À retirer quand l'équipe remettra l'authentification.
+----------------------------------
+*/
+app.use((req, res, next) => {
+    if (!req.session.userId && defaultEtudiantId) {
+        req.session.userId = defaultEtudiantId;
+        req.session.role = "etudiant";
+    }
+    next();
+});
+
+// La racine ouvre directement l'espace étudiant
+app.get("/", (req, res) => {
+    res.redirect("/etudiant/dashboard-student.html");
+});
+
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /*
 ----------------------------------
@@ -194,12 +232,13 @@ app.post("/api/auth/activate", (req, res) => {
 
 /*
 ----------------------------------
-ROUTES ADMIN
+ROUTES API
 ----------------------------------
 */
 
 app.use("/api/admin", adminRoutes(db));
 app.use("/api/encadrant", encadrantRoutes(db));
+app.use("/api/etudiant", etudiantRoutes(db));
 
 /*
 ----------------------------------

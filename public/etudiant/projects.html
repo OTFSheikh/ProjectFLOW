@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Mes projets</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        /* Toolbar filtres + recherche */
+        .projects-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .filters-row {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            padding: 0.4rem 0.875rem;
+            border-radius: 18px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: all var(--transition);
+            font-family: inherit;
+        }
+        .filter-chip:hover { background: var(--gray-50); }
+        .filter-chip.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.4rem 0.75rem;
+            width: 250px;
+            transition: border-color var(--transition);
+        }
+        .search-box:focus-within { border-color: var(--primary); }
+        .search-box i { color: var(--gray-400); margin-right: 0.5rem; font-size: 0.8rem; }
+        .search-box input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-family: inherit;
+            font-size: 0.85rem;
+            color: var(--gray-900);
+        }
+
+        /* Grid des projets */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+
+        .project-tile {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 1.125rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .project-tile:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+            transform: translateY(-1px);
+        }
+
+        .tile-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .tile-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1.3;
+        }
+
+        .tile-group {
+            font-size: 0.78rem;
+            color: var(--gray-500);
+            margin-top: 0.15rem;
+        }
+
+        .tile-role-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tile-role {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 10px;
+        }
+        .role-leader { background: var(--primary-light); color: var(--primary-dark); }
+        .role-membre { background: var(--gray-100); color: var(--gray-600); }
+
+        .tile-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--gray-100);
+        }
+        .tile-info-row i { color: var(--gray-400); margin-right: 0.25rem; }
+
+        .tile-sujet {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+        }
+        .tile-sujet i { color: var(--gray-400); margin-right: 0.25rem; }
+
+        /* Membres (avatars) + progression */
+        .tile-members { display: flex; align-items: center; gap: 0.5rem; }
+        .tile-avatars { display: flex; }
+        .tile-avatar {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #fff; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.62rem; border: 2px solid var(--white); margin-left: -7px;
+        }
+        .tile-avatar:first-child { margin-left: 0; }
+        .tile-avatar.more { background: var(--gray-200); color: var(--gray-600); }
+        .tile-members-count { font-size: 0.72rem; color: var(--gray-500); }
+        .tile-progress { display: flex; align-items: center; gap: 0.5rem; }
+        .tile-progress-bar {
+            flex: 1; height: 5px; background: var(--gray-100); border-radius: 5px; overflow: hidden;
+        }
+        .tile-progress-fill {
+            height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+        }
+        .tile-progress-value {
+            font-size: 0.7rem; font-weight: 600; color: var(--gray-700); min-width: 32px; text-align: right;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            background: var(--white);
+            border: 1px dashed var(--gray-200);
+            border-radius: var(--radius);
+            color: var(--gray-500);
+            grid-column: 1 / -1;
+        }
+        .empty-state i {
+            font-size: 2.5rem;
+            color: var(--gray-300);
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Mes projets</div>
+                <h1>Mes projets</h1>
+            </div>
+            <div class="topbar-right">
+                <span id="activeCount">…</span>
+            </div>
+        </header>
+
+        <main class="page-content">
+
+            <!-- Toolbar : filtres + recherche -->
+            <div class="projects-toolbar">
+                <div class="filters-row" id="filtersRow">
+                    <button class="filter-chip active" data-filter="all">Tous <span data-count="all">0</span></button>
+                    <button class="filter-chip" data-filter="leader">👑 Team Leader <span data-count="leader">0</span></button>
+                    <button class="filter-chip" data-filter="membre">👤 Membre <span data-count="membre">0</span></button>
+                    <button class="filter-chip" data-filter="En_cours">En cours</button>
+                    <button class="filter-chip" data-filter="En_retard">En retard</button>
+                </div>
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Rechercher un projet..." />
+                </div>
+            </div>
+
+            <!-- Grid des projets (rempli par JS) -->
+            <div class="projects-grid" id="projectsGrid">
+                <div class="empty-state">Chargement de vos projets…</div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar("projects");
+        checkEtudiantAuth(); // sécurise la page + remplit le nom/avatar de la sidebar
+
+        const API = "/api/etudiant";
+        const state = { projects: [], filter: "all", search: "" };
+
+        /* États de groupe -> libellé + classe couleur (doc partie 4) */
+        const ETAT_GROUPE = {
+            Propose:   ["Proposé",   "etat-groupe-propose"],
+            En_cours:  ["En cours",  "etat-groupe-encours"],
+            En_retard: ["En retard", "etat-groupe-enretard"],
+            Livre:     ["Livré",     "etat-groupe-livre"],
+            Soutenu:   ["Soutenu",   "etat-groupe-soutenu"],
+            Cloture:   ["Clôturé",   "etat-groupe-cloture"]
+        };
+
+        function esc(s) {
+            if (s == null) return "";
+            return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+        }
+        function fmtDate(d) {
+            if (!d) return "—";
+            return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+        }
+        function initialsFromName(full) {
+            const parts = String(full || "").trim().split(/\s+/);
+            return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";
+        }
+        function avatarsHtml(membresNoms) {
+            const names = String(membresNoms || "").split("|").filter(Boolean);
+            const shown = names.slice(0, 4).map(n =>
+                `<div class="tile-avatar" title="${esc(n)}">${esc(initialsFromName(n))}</div>`
+            ).join("");
+            const more = names.length > 4 ? `<div class="tile-avatar more">+${names.length - 4}</div>` : "";
+            return shown + more;
+        }
+
+        async function loadProjects() {
+            try {
+                const res = await fetch(`${API}/projects`, { credentials: "include" });
+                if (res.status === 401) { location.href = "/login.html"; return; }
+                if (!res.ok) { document.getElementById("projectsGrid").innerHTML = `<div class="empty-state">Erreur de chargement.</div>`; return; }
+                const data = await res.json();
+                state.projects = data.projects || [];
+                updateCounts();
+                render();
+            } catch (e) {
+                document.getElementById("projectsGrid").innerHTML = `<div class="empty-state">Impossible de joindre le serveur.</div>`;
+            }
+        }
+
+        function updateCounts() {
+            const all = state.projects.length;
+            const leader = state.projects.filter(p => p.est_team_leader).length;
+            const membre = all - leader;
+            document.querySelector('[data-count="all"]').textContent = all;
+            document.querySelector('[data-count="leader"]').textContent = leader;
+            document.querySelector('[data-count="membre"]').textContent = membre;
+            const actifs = state.projects.filter(p => p.etat_groupe !== "Cloture").length;
+            document.getElementById("activeCount").textContent = actifs + " projet" + (actifs > 1 ? "s" : "") + " actif" + (actifs > 1 ? "s" : "");
+        }
+
+        function matchesFilter(p) {
+            if (state.filter === "all") return true;
+            if (state.filter === "leader") return !!p.est_team_leader;
+            if (state.filter === "membre") return !p.est_team_leader;
+            return p.etat_groupe === state.filter; // En_cours / En_retard
+        }
+        function matchesSearch(p) {
+            if (!state.search) return true;
+            const q = state.search.toLowerCase();
+            return (p.nom_projet || "").toLowerCase().includes(q) || (p.nom_groupe || "").toLowerCase().includes(q);
+        }
+
+        function render() {
+            const grid = document.getElementById("projectsGrid");
+            const list = state.projects.filter(p => matchesFilter(p) && matchesSearch(p));
+            if (!list.length) {
+                grid.innerHTML = `<div class="empty-state"><i class="fas fa-folder-open"></i><div>Aucun projet à afficher.</div></div>`;
+                return;
+            }
+            grid.innerHTML = list.map(p => {
+                const etat = ETAT_GROUPE[p.etat_groupe] || [esc(p.etat_groupe || "—"), "badge-gray"];
+                const isLeader = !!p.est_team_leader;
+                const role = isLeader
+                    ? `<span class="tile-role role-leader"><i class="fas fa-crown"></i> Team Leader</span>`
+                    : `<span class="tile-role role-membre"><i class="fas fa-user"></i> Membre</span>`;
+                const sujet = p.sujet
+                    ? `<div class="tile-sujet"><i class="fas fa-bookmark"></i> ${esc(p.sujet)}</div>`
+                    : `<div class="tile-sujet"><i class="fas fa-bookmark"></i> <em>Aucun sujet choisi</em></div>`;
+                return `
+                    <a href="/etudiant/project.html?id=${p.id_projet}" class="project-tile">
+                        <div class="tile-top">
+                            <div>
+                                <div class="tile-title">${esc(p.nom_projet)}</div>
+                                <div class="tile-group"><i class="fas fa-users"></i> ${esc(p.nom_groupe || "")}</div>
+                            </div>
+                            <span class="badge ${etat[1]}">${etat[0]}</span>
+                        </div>
+                        <div class="tile-role-row">${role}</div>
+                        ${sujet}
+                        <div class="tile-members">
+                            <div class="tile-avatars">${avatarsHtml(p.membres_noms)}</div>
+                            <span class="tile-members-count">${p.nb_membres || 0} membre${(p.nb_membres || 0) > 1 ? "s" : ""}</span>
+                        </div>
+                        <div class="tile-progress" title="${p.nb_taches_done || 0}/${p.nb_taches || 0} tâches terminées">
+                            <div class="tile-progress-bar"><div class="tile-progress-fill" style="width:${p.progression || 0}%"></div></div>
+                            <span class="tile-progress-value">${p.progression || 0}%</span>
+                        </div>
+                        <div class="tile-info-row">
+                            <div><i class="fas fa-calendar"></i> Soutenance : ${fmtDate(p.date_fin)}</div>
+                        </div>
+                    </a>`;
+            }).join("");
+        }
+
+        /* Filtres */
+        document.querySelectorAll("#filtersRow .filter-chip").forEach(chip => {
+            chip.addEventListener("click", () => {
+                document.querySelectorAll("#filtersRow .filter-chip").forEach(c => c.classList.remove("active"));
+                chip.classList.add("active");
+                state.filter = chip.dataset.filter;
+                render();
+            });
+        });
+
+        /* Recherche */
+        document.getElementById("searchInput").addEventListener("input", (e) => {
+            state.search = e.target.value.trim();
+            render();
+        });
+
+        loadProjects();
+    </script>
+</body>
+</html>

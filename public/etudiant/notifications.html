@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectFLOW - Notifications</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="common.css" />
+    <style>
+        /* Toolbar */
+        .notif-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .notif-filters {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            padding: 0.4rem 0.875rem;
+            border-radius: 18px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: all var(--transition);
+            font-family: inherit;
+        }
+        .filter-chip:hover { background: var(--gray-50); }
+        .filter-chip.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+        .filter-chip .count {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            padding: 1px 6px;
+            border-radius: 9px;
+            font-size: 0.68rem;
+            margin-left: 0.3rem;
+        }
+        .filter-chip.active .count {
+            background: rgba(255,255,255,0.3);
+            color: var(--white);
+        }
+
+        /* Section date */
+        .notif-section {
+            margin-bottom: 1.5rem;
+        }
+        .notif-section-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.625rem;
+            padding-left: 0.25rem;
+        }
+
+        /* Carte notif */
+        .notif-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.875rem 1rem;
+            margin-bottom: 0.5rem;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 0.875rem;
+            align-items: flex-start;
+            transition: all var(--transition);
+            cursor: pointer;
+        }
+        .notif-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+        .notif-card.unread {
+            background: #FFFBF5;
+            border-left: 3px solid var(--primary);
+        }
+
+        .notif-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            flex-shrink: 0;
+        }
+        .notif-icon.success { background: var(--secondary-light); color: var(--secondary); }
+        .notif-icon.danger { background: var(--danger-light); color: var(--danger); }
+        .notif-icon.warning { background: var(--warning-light); color: var(--warning); }
+        .notif-icon.info { background: var(--info-light); color: var(--info); }
+        .notif-icon.primary { background: var(--primary-light); color: var(--primary); }
+        .notif-icon.gray { background: var(--gray-100); color: var(--gray-600); }
+
+        .notif-content {
+            min-width: 0;
+        }
+        .notif-text {
+            font-size: 0.88rem;
+            color: var(--gray-900);
+            line-height: 1.4;
+            margin-bottom: 0.25rem;
+        }
+        .notif-text strong { font-weight: 600; }
+        .notif-text a { color: var(--primary); text-decoration: none; font-weight: 500; }
+        .notif-text a:hover { text-decoration: underline; }
+
+        .notif-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.72rem;
+            color: var(--gray-500);
+            flex-wrap: wrap;
+        }
+        .notif-meta .dot {
+            color: var(--gray-300);
+        }
+        .notif-meta a { color: var(--primary); text-decoration: none; font-weight: 500; }
+        .notif-meta a:hover { text-decoration: underline; }
+
+        .notif-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex-shrink: 0;
+        }
+        .notif-actions .unread-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
+            margin-top: 0.5rem;
+        }
+        .notif-card:not(.unread) .unread-dot {
+            visibility: hidden;
+        }
+
+        /* État vide */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            background: var(--white);
+            border: 1px dashed var(--gray-200);
+            border-radius: var(--radius);
+            color: var(--gray-500);
+        }
+        .empty-state i {
+            font-size: 2.5rem;
+            color: var(--gray-300);
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav id="sidebar"></nav>
+
+    <div class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Notifications</div>
+                <h1>Notifications</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="btn btn-secondary" id="markAllBtn">
+                    <i class="fas fa-check-double"></i> Tout marquer comme lu
+                </button>
+            </div>
+        </header>
+
+        <main class="page-content">
+
+            <!-- Toolbar : filtres -->
+            <div class="notif-toolbar">
+                <div class="notif-filters" id="notifFilters">
+                    <button class="filter-chip active" data-filter="all">Toutes <span class="count" data-count="all">0</span></button>
+                    <button class="filter-chip" data-filter="unread">Non lues <span class="count" data-count="unread">0</span></button>
+                    <button class="filter-chip" data-filter="livrables">Livrables</button>
+                    <button class="filter-chip" data-filter="taches">Tâches</button>
+                    <button class="filter-chip" data-filter="chat">Chat</button>
+                    <button class="filter-chip" data-filter="systeme">Système</button>
+                </div>
+            </div>
+
+            <!-- Liste (remplie par JS) -->
+            <div id="notifContainer">
+                <div class="empty-state">Chargement de vos notifications…</div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="sidebar.js"></script>
+    <script>
+    /* ============================================================
+       Champs attendus depuis GET /api/etudiant/notifications :
+         { notifications: [{ id_notification, contenu, lu,
+                             date_creation, type?, id_projet? }] }
+       - `type` (optionnel) sert à l'icône + aux filtres catégorie.
+         Valeurs reconnues : validation, livrable, refus, tache,
+         assignation, jalon, echeance, commentaire, chat, message,
+         team_leader, systeme. (Adapter si tes valeurs diffèrent.)
+       - `id_projet` (optionnel) crée le lien vers le projet concerné.
+    ============================================================ */
+    renderSidebar("notifications");
+    checkEtudiantAuth();
+
+    const API = "/api/etudiant";
+    const state = { notifs: [], filter: "all" };
+
+    const TYPE_ICON = {
+        validation:  ["success", "fa-check-circle"],
+        livrable:    ["info",    "fa-file"],
+        refus:       ["danger",  "fa-times-circle"],
+        tache:       ["gray",    "fa-clipboard-list"],
+        assignation: ["gray",    "fa-clipboard-list"],
+        jalon:       ["success", "fa-flag"],
+        echeance:    ["warning", "fa-exclamation-triangle"],
+        commentaire: ["info",    "fa-comment"],
+        chat:        ["info",    "fa-comments"],
+        message:     ["info",    "fa-comments"],
+        team_leader: ["primary", "fa-crown"],
+        systeme:     ["gray",    "fa-bell"]
+    };
+    const CATEGORIES = {
+        livrables: ["validation", "livrable", "refus"],
+        taches:    ["tache", "assignation", "jalon", "echeance"],
+        chat:      ["chat", "message", "commentaire"],
+        systeme:   ["systeme", "team_leader"]
+    };
+
+    function esc(s) {
+        if (s == null) return "";
+        return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    }
+    function iconFor(type) { return TYPE_ICON[type] || ["gray", "fa-bell"]; }
+    function fmtTime(d) {
+        if (!d) return "";
+        return new Date(d).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    }
+    function dayBucket(d) {
+        const dt = new Date(d), now = new Date();
+        const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const b = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        const diff = (a - b) / 86400000;
+        if (diff <= 0) return "Aujourd'hui";
+        if (diff === 1) return "Hier";
+        return "Plus tôt";
+    }
+
+    async function api(method, path) {
+        const res = await fetch(API + path, { method, credentials: "include" });
+        if (res.status === 401) { location.href = "/login.html"; throw new Error("unauth"); }
+        let data = null; try { data = await res.json(); } catch (e) {}
+        return { ok: res.ok, status: res.status, data };
+    }
+
+    async function load() {
+        try {
+            const res = await fetch(`${API}/notifications`, { credentials: "include" });
+            if (res.status === 401) { location.href = "/login.html"; return; }
+            if (!res.ok) { document.getElementById("notifContainer").innerHTML = `<div class="empty-state">Erreur de chargement.</div>`; return; }
+            const d = await res.json();
+            state.notifs = d.notifications || [];
+            updateCounts();
+            render();
+        } catch (e) {
+            document.getElementById("notifContainer").innerHTML = `<div class="empty-state">Impossible de joindre le serveur.</div>`;
+        }
+    }
+
+    function updateCounts() {
+        document.querySelector('[data-count="all"]').textContent = state.notifs.length;
+        document.querySelector('[data-count="unread"]').textContent = state.notifs.filter(n => !n.lu).length;
+    }
+
+    function matchesFilter(n) {
+        if (state.filter === "all") return true;
+        if (state.filter === "unread") return !n.lu;
+        const cats = CATEGORIES[state.filter];
+        return cats ? cats.includes(n.type) : true;
+    }
+
+    function render() {
+        const container = document.getElementById("notifContainer");
+        const list = state.notifs.filter(matchesFilter);
+        if (!list.length) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-bell-slash"></i><div>Aucune notification.</div></div>`;
+            return;
+        }
+        const buckets = { "Aujourd'hui": [], "Hier": [], "Plus tôt": [] };
+        list.forEach(n => buckets[dayBucket(n.date_creation)].push(n));
+
+        let html = "";
+        ["Aujourd'hui", "Hier", "Plus tôt"].forEach(label => {
+            if (!buckets[label].length) return;
+            html += `<div class="notif-section"><div class="notif-section-title">${label}</div>`;
+            html += buckets[label].map(n => {
+                const [cls, icon] = iconFor(n.type);
+                const link = n.id_projet ? `<span class="dot">·</span><a href="/etudiant/project.html?id=${n.id_projet}">Voir le projet</a>` : "";
+                return `
+                    <div class="notif-card ${n.lu ? "" : "unread"}" data-id="${n.id_notification}">
+                        <div class="notif-icon ${cls}"><i class="fas ${icon}"></i></div>
+                        <div class="notif-content">
+                            <div class="notif-text">${esc(n.contenu || n.message || "")}</div>
+                            <div class="notif-meta"><span>${fmtTime(n.date_creation)}</span>${link}</div>
+                        </div>
+                        <div class="notif-actions"><div class="unread-dot" title="Non lue"></div></div>
+                    </div>`;
+            }).join("");
+            html += `</div>`;
+        });
+        container.innerHTML = html;
+
+        // Clic sur une carte = marquer comme lue (sauf clic sur un lien)
+        container.querySelectorAll(".notif-card").forEach(card => {
+            card.addEventListener("click", async (e) => {
+                if (e.target.tagName === "A") return;
+                if (!card.classList.contains("unread")) return;
+                const id = card.dataset.id;
+                const { ok } = await api("PATCH", `/notifications/${id}/read`);
+                if (ok) {
+                    card.classList.remove("unread");
+                    const n = state.notifs.find(x => String(x.id_notification) === String(id));
+                    if (n) n.lu = 1;
+                    updateCounts();
+                }
+            });
+        });
+    }
+
+    /* Filtres */
+    document.querySelectorAll("#notifFilters .filter-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            document.querySelectorAll("#notifFilters .filter-chip").forEach(c => c.classList.remove("active"));
+            chip.classList.add("active");
+            state.filter = chip.dataset.filter;
+            render();
+        });
+    });
+
+    /* Tout marquer comme lu */
+    document.getElementById("markAllBtn").addEventListener("click", async () => {
+        const { ok } = await api("PATCH", "/notifications/read-all");
+        if (ok) {
+            state.notifs.forEach(n => n.lu = 1);
+            updateCounts();
+            render();
+        }
+    });
+
+    load();
+    </script>
+</body>
+</html>

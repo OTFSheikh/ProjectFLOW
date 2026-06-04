@@ -18,4 +18,14 @@ function requireEncadrant(req, res, next) {
     next();
 }
 
-module.exports = { requireAdmin, requireEncadrant };
+function requireEtudiant(req, res, next) {
+    if (!req.session || !req.session.userId || req.session.role !== "etudiant") {
+        return res.status(401).json({
+            success: false,
+            message: "Accès réservé aux étudiants"
+        });
+    }
+    next();
+}
+
+module.exports = { requireAdmin, requireEncadrant, requireEtudiant };
