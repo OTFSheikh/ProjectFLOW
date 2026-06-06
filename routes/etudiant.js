@@ -10,6 +10,7 @@ const path = require("path");
 const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const { requireEtudiant } = require("../middleware/auth");
+const { comparePassword, hashPassword } = require("../utils/password");
 
 // ============================================================
 // Configuration upload de fichiers (livrables)
@@ -51,6 +52,92 @@ module.exports = function (db) {
         );
     }
 
+    // ============================================================
+    // ÉTATS DU GROUPE (doc - récap des états)
+    // Propose -> En_cours -> (En_retard) -> Livre -> Soutenu -> Cloture
+    // ============================================================
+
+    // Un groupe est "en retard" si une deadline (tâche, jalon ou globale du
+    // projet) est dépassée alors que tout le travail n'est pas terminé.
+    // (Étape 6 du flow : bascule automatique vers « En retard ».)
+    const LATE_PREDICATE = `(
+        EXISTS (
+            SELECT 1 FROM Jalon j JOIN Tache t ON t.id_jalon = j.id_jalon
+            WHERE j.id_groupe = g.id_groupe AND t.statut <> 'Terminee' AND t.date_limite < NOW()
+        )
+        OR EXISTS (
+            SELECT 1 FROM Jalon j
+            WHERE j.id_groupe = g.id_groupe AND j.date_limite < NOW()
+              AND EXISTS (SELECT 1 FROM Tache t WHERE t.id_jalon = j.id_jalon AND t.statut <> 'Terminee')
+        )
+        OR EXISTS (
+            SELECT 1 FROM Projet p
+            WHERE p.id_projet = g.id_projet AND p.date_fin < CURDATE()
+              AND EXISTS (SELECT 1 FROM Jalon j JOIN Tache t ON t.id_jalon = j.id_jalon
+                          WHERE j.id_groupe = g.id_groupe AND t.statut <> 'Terminee')
+        )
+    )`;
+
+    // Recalcule l'état (En_cours <-> En_retard) pour les groupes ciblés par
+    // scopeSql. On ne touche JAMAIS aux états Propose / Livre / Soutenu / Cloture.
+    // scopeSql : ex. "g.id_groupe = ?" ou une sous-requête sur Membre_de.
+    function refreshGroupStates(scopeSql, params, cb) {
+        const toLate = `UPDATE Groupe g SET g.etat = 'En_retard'
+                        WHERE g.etat = 'En_cours' AND ${scopeSql} AND ${LATE_PREDICATE}`;
+        const toRecover = `UPDATE Groupe g SET g.etat = 'En_cours'
+                           WHERE g.etat = 'En_retard' AND ${scopeSql} AND NOT ${LATE_PREDICATE}`;
+        db.query(toLate, params, (e1) => {
+            if (e1) return cb(e1);
+            db.query(toRecover, params, (e2) => cb(e2 || null));
+        });
+    }
+
+    // Passage automatique Propose -> En_cours quand le Team Leader commence à
+    // organiser le travail (création d'un jalon ou d'une tâche). (Étape 5.)
+    function bumpGroupToEnCours(groupId, cb) {
+        db.query(
+            "UPDATE Groupe SET etat = 'En_cours' WHERE id_groupe = ? AND etat = 'Propose'",
+            [groupId],
+            (err) => cb && cb(err || null)
+        );
+    }
+
+    // Insère une notification pour une liste d'utilisateurs (déduplication +
+    // ignore les vides). type : voir les catégories du front (assignation,
+    // livrable, chat, validation, refus, systeme, ...). idProjet : lien "Voir le projet".
+    function notify(userIds, contenu, type, idProjet, cb) {
+        const ids = [...new Set((userIds || []).filter(Boolean))];
+        if (!ids.length) return cb && cb(null);
+        const values = ids.map((uid) => [contenu, type || "systeme", idProjet || null, uid]);
+        db.query(
+            "INSERT INTO Notification (contenu, type, id_projet, id_utilisateur) VALUES ?",
+            [values],
+            (err) => cb && cb(err || null)
+        );
+    }
+
+    // Récupère les co-membres d'un groupe (tous sauf exceptId) + l'id du projet.
+    function groupAudience(groupId, exceptId, cb) {
+        db.query(
+            `SELECT g.id_projet,
+                    GROUP_CONCAT(m.id_utilisateur) AS membres
+             FROM Groupe g
+             JOIN Membre_de m ON m.id_groupe = g.id_groupe
+             WHERE g.id_groupe = ?
+             GROUP BY g.id_projet`,
+            [groupId],
+            (err, rows) => {
+                if (err || !rows.length) return cb(err, null, []);
+                const idProjet = rows[0].id_projet;
+                const all = (rows[0].membres || "")
+                    .split(",")
+                    .map(Number)
+                    .filter((id) => id && id !== Number(exceptId));
+                cb(null, idProjet, all);
+            }
+        );
+    }
+
     // Construit la requête d'activité (livrables + messages) avec une condition
     // de portée injectée (tous mes groupes, ou un groupe précis).
     function activitySql(cond) {
@@ -85,6 +172,10 @@ module.exports = function (db) {
     router.get("/dashboard", (req, res) => {
         const userId = req.session.userId;
 
+        // Bascule auto En_cours <-> En_retard sur tous mes groupes avant de compter.
+        const scope = "g.id_groupe IN (SELECT id_groupe FROM Membre_de WHERE id_utilisateur = ?)";
+        refreshGroupStates(scope, [userId], () => {
+
         // Compter les projets en cours
         const sqlProjects = `
             SELECT COUNT(DISTINCT p.id_projet) AS count
@@ -114,10 +205,11 @@ module.exports = function (db) {
         `;
 
         // Compter les livrables refusés sur ses groupes
+        // (on tolère 'Refuse' ET 'Rejete' selon l'historique de saisie encadrant)
         const sqlRefused = `
             SELECT COUNT(*) AS count
             FROM Livrable l
-            WHERE l.statut_validation = 'Refuse'
+            WHERE l.statut_validation IN ('Refuse', 'Rejete')
               AND (
                   l.id_etudiant_deposant = ?
                   OR l.id_groupe IN (SELECT id_groupe FROM Membre_de WHERE id_utilisateur = ?)
@@ -145,6 +237,7 @@ module.exports = function (db) {
                 });
             });
         });
+        }); // refreshGroupStates
     });
 
     /* ============================================================
@@ -178,6 +271,8 @@ module.exports = function (db) {
     ============================================================ */
     router.get("/projects", (req, res) => {
         const userId = req.session.userId;
+        const scope = "g.id_groupe IN (SELECT id_groupe FROM Membre_de WHERE id_utilisateur = ?)";
+        refreshGroupStates(scope, [userId], () => {
         const sql = `
             SELECT
                 p.id_projet, p.nom AS nom_projet, p.etat AS etat_projet,
@@ -208,6 +303,7 @@ module.exports = function (db) {
             }));
             res.json({ success: true, projects });
         });
+        }); // refreshGroupStates
     });
 
     /* ============================================================
@@ -216,6 +312,10 @@ module.exports = function (db) {
     router.get("/projects/:id", (req, res) => {
         const userId = req.session.userId;
         const projectId = req.params.id;
+
+        // Recalcule l'état du/des groupe(s) de ce projet pour cet étudiant (auto En_retard).
+        const scope = "g.id_groupe IN (SELECT id_groupe FROM Membre_de WHERE id_utilisateur = ? AND id_groupe IN (SELECT id_groupe FROM Groupe WHERE id_projet = ?))";
+        refreshGroupStates(scope, [userId, projectId], () => {
 
         // 1. Récupérer le groupe de l'étudiant pour ce projet
         const sqlGroup = `
@@ -259,6 +359,100 @@ module.exports = function (db) {
                         group: group,
                         isTeamLeader: !!group.est_team_leader,
                         members: membersResults
+                    });
+                });
+            });
+        });
+        }); // refreshGroupStates
+    });
+
+    /* ============================================================
+       SUJETS DU PROJET (Étape 4 — choix du sujet)
+       Liste des sujets disponibles + sujet choisi par le groupe.
+    ============================================================ */
+    router.get("/projects/:id/subjects", (req, res) => {
+        const userId = req.session.userId;
+        const projectId = req.params.id;
+
+        // Vérifier que l'étudiant est bien membre d'un groupe de ce projet
+        const sqlGroup = `
+            SELECT g.id_groupe, g.id_sujet, g.etat, m.est_team_leader
+            FROM Membre_de m
+            JOIN Groupe g ON g.id_groupe = m.id_groupe
+            WHERE m.id_utilisateur = ? AND g.id_projet = ?
+            LIMIT 1
+        `;
+        db.query(sqlGroup, [userId, projectId], (err, gRows) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (gRows.length === 0) {
+                return res.status(403).json({ success: false, message: "Vous n'êtes pas membre d'un groupe sur ce projet" });
+            }
+            const grp = gRows[0];
+
+            const sqlSubjects = `
+                SELECT s.id_sujet, s.titre, s.description,
+                       (SELECT COUNT(*) FROM Document_sujet d WHERE d.id_sujet = s.id_sujet) AS nb_documents
+                FROM Sujet s
+                WHERE s.id_projet = ?
+                ORDER BY s.id_sujet ASC
+            `;
+            db.query(sqlSubjects, [projectId], (err2, subjects) => {
+                if (err2) return res.status(500).json({ success: false, error: err2.message });
+                res.json({
+                    success: true,
+                    subjects,
+                    id_groupe: grp.id_groupe,
+                    sujet_choisi: grp.id_sujet,         // null si pas encore choisi
+                    etat_groupe: grp.etat,
+                    isTeamLeader: !!grp.est_team_leader,
+                    // Si un seul sujet, le choix est implicite (Étape 4 : étape sautée)
+                    choixObligatoire: subjects.length > 1
+                });
+            });
+        });
+    });
+
+    /* ============================================================
+       CHOISIR LE SUJET DU GROUPE (Étape 4 — Team Leader)
+       Autorisé uniquement tant que le groupe est « Proposé ».
+    ============================================================ */
+    router.post("/groups/:groupId/subject", (req, res) => {
+        const userId = req.session.userId;
+        const groupId = req.params.groupId;
+        const { id_sujet } = req.body;
+
+        if (!id_sujet) {
+            return res.status(400).json({ success: false, message: "id_sujet requis" });
+        }
+
+        isMember(userId, groupId, (err, info) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (!info.isLeader) return res.status(403).json({ success: false, message: "Réservé au Team Leader" });
+
+            // Le groupe doit être à l'état « Proposé »
+            db.query("SELECT id_projet, etat FROM Groupe WHERE id_groupe = ?", [groupId], (e1, gRows) => {
+                if (e1) return res.status(500).json({ success: false, error: e1.message });
+                if (gRows.length === 0) return res.status(404).json({ success: false, message: "Groupe introuvable" });
+                if (gRows[0].etat !== "Propose") {
+                    return res.status(409).json({ success: false, message: "Le sujet ne peut être choisi que lorsque le groupe est « Proposé »" });
+                }
+                const idProjet = gRows[0].id_projet;
+
+                // Le sujet doit appartenir au même projet
+                db.query("SELECT id_sujet FROM Sujet WHERE id_sujet = ? AND id_projet = ?", [id_sujet, idProjet], (e2, sRows) => {
+                    if (e2) return res.status(500).json({ success: false, error: e2.message });
+                    if (sRows.length === 0) {
+                        return res.status(400).json({ success: false, message: "Ce sujet n'appartient pas à ce projet" });
+                    }
+
+                    db.query("UPDATE Groupe SET id_sujet = ? WHERE id_groupe = ?", [id_sujet, groupId], (e3) => {
+                        if (e3) return res.status(500).json({ success: false, error: e3.message });
+                        // Prévenir les membres du groupe
+                        groupAudience(groupId, null, (eA, idProj, members) => {
+                            notify(members, "Le sujet du groupe a été choisi", "systeme", idProj || idProjet, () => {
+                                res.json({ success: true });
+                            });
+                        });
                     });
                 });
             });
@@ -362,6 +556,9 @@ module.exports = function (db) {
             if (err) return res.status(500).json({ success: false, error: err.message });
             if (!info.isMember) return res.status(403).json({ success: false, message: "Accès refusé" });
 
+            // Recalcule l'état (auto En_retard) avant de renvoyer les jalons/tâches
+            refreshGroupStates("g.id_groupe = ?", [groupId], () => {
+
             // GROUP_CONCAT remonte la liste des id des étudiants assignés à chaque
             // tâche (ex : "3,7,12"), agrégée par tâche. Les noms sont résolus côté
             // front à partir de la liste des membres déjà chargée.
@@ -381,6 +578,7 @@ module.exports = function (db) {
                 if (err) return res.status(500).json({ success: false, error: err.message });
                 res.json({ success: true, rows: results, isTeamLeader: info.isLeader });
             });
+            }); // refreshGroupStates
         });
     });
 
@@ -399,7 +597,10 @@ module.exports = function (db) {
                 [titre, description, date_limite, groupId],
                 (err, result) => {
                     if (err) return res.status(500).json({ success: false, error: err.message });
-                    res.json({ success: true, id_jalon: result.insertId });
+                    // Étape 5 : le Team Leader structure le travail -> le groupe passe « En cours »
+                    bumpGroupToEnCours(groupId, () => {
+                        res.json({ success: true, id_jalon: result.insertId });
+                    });
                 }
             );
         });
@@ -477,6 +678,9 @@ module.exports = function (db) {
                         if (err) return res.status(500).json({ success: false, error: err.message });
                         const taskId = result.insertId;
 
+                        // Étape 5 : création de tâche -> le groupe passe « En cours »
+                        bumpGroupToEnCours(groupId, () => {
+
                         // Si des assignations sont fournies, vérifier qu'elles concernent
                         // bien des MEMBRES du groupe avant de les insérer (règle métier doc).
                         if (assignees && assignees.length > 0) {
@@ -495,14 +699,8 @@ module.exports = function (db) {
                                         // Notifier chaque assigné (type 'assignation' + lien vers le projet)
                                         db.query("SELECT id_projet FROM Groupe WHERE id_groupe = ?", [groupId], (eP, rP) => {
                                             const idProjet = (rP && rP.length) ? rP[0].id_projet : null;
-                                            const notifs = uniques.map(uid => [
-                                                `Nouvelle tâche assignée : ${titre}`, "assignation", idProjet, uid
-                                            ]);
-                                            db.query(
-                                                "INSERT INTO Notification (contenu, type, id_projet, id_utilisateur) VALUES ?",
-                                                [notifs],
-                                                () => res.json({ success: true, id_tache: taskId })
-                                            );
+                                            notify(uniques, `Nouvelle tâche assignée : ${titre}`, "assignation", idProjet,
+                                                () => res.json({ success: true, id_tache: taskId }));
                                         });
                                     });
                                 }
@@ -510,6 +708,7 @@ module.exports = function (db) {
                         } else {
                             res.json({ success: true, id_tache: taskId });
                         }
+                        }); // bumpGroupToEnCours
                     }
                 );
             });
@@ -521,6 +720,12 @@ module.exports = function (db) {
         const userId = req.session.userId;
         const taskId = req.params.id;
         const { statut } = req.body;
+
+        // Statuts valides (doc : À faire -> En cours -> Terminé)
+        const STATUTS = ["A_faire", "En_cours", "Terminee"];
+        if (!STATUTS.includes(statut)) {
+            return res.status(400).json({ success: false, message: "Statut invalide" });
+        }
 
         // Vérifier que l'étudiant est soit assigné, soit Team Leader du groupe
         const sql = `
@@ -548,6 +753,86 @@ module.exports = function (db) {
                 res.json({ success: true });
             });
         });
+    });
+
+    // Modifier une tâche (Team Leader uniquement) — titre, description, échéance,
+    // priorité et réassignation éventuelle. (Cahier des charges : modification des tâches.)
+    router.put("/tasks/:id", (req, res) => {
+        const userId = req.session.userId;
+        const taskId = req.params.id;
+        const { titre, description, date_limite, priorite, assignees } = req.body;
+
+        db.query(
+            "SELECT j.id_groupe FROM Tache t JOIN Jalon j ON j.id_jalon = t.id_jalon WHERE t.id_tache = ?",
+            [taskId],
+            (err, rows) => {
+                if (err) return res.status(500).json({ success: false, error: err.message });
+                if (rows.length === 0) return res.status(404).json({ success: false, message: "Tâche introuvable" });
+                const groupId = rows[0].id_groupe;
+
+                isMember(userId, groupId, (e2, info) => {
+                    if (e2) return res.status(500).json({ success: false, error: e2.message });
+                    if (!info.isLeader) return res.status(403).json({ success: false, message: "Réservé au Team Leader" });
+
+                    db.query(
+                        "UPDATE Tache SET titre = ?, description = ?, date_limite = ?, priorite = ? WHERE id_tache = ?",
+                        [titre, description, date_limite, priorite || "Moyenne", taskId],
+                        (e3) => {
+                            if (e3) return res.status(500).json({ success: false, error: e3.message });
+
+                            // Réassignation optionnelle : on remplace les assignés
+                            if (!Array.isArray(assignees)) return res.json({ success: true });
+                            const uniques = [...new Set(assignees)];
+                            db.query("DELETE FROM Assigne_a WHERE id_tache = ?", [taskId], (e4) => {
+                                if (e4) return res.status(500).json({ success: false, error: e4.message });
+                                if (!uniques.length) return res.json({ success: true });
+                                db.query(
+                                    "SELECT id_utilisateur FROM Membre_de WHERE id_groupe = ? AND id_utilisateur IN (?)",
+                                    [groupId, uniques],
+                                    (e5, memberRows) => {
+                                        if (e5) return res.status(500).json({ success: false, error: e5.message });
+                                        if (memberRows.length !== uniques.length) {
+                                            return res.status(400).json({ success: false, message: "Tous les assignés doivent être membres du groupe" });
+                                        }
+                                        const values = uniques.map((uid) => [uid, taskId]);
+                                        db.query("INSERT INTO Assigne_a (id_utilisateur, id_tache) VALUES ?", [values], (e6) => {
+                                            if (e6) return res.status(500).json({ success: false, error: e6.message });
+                                            res.json({ success: true });
+                                        });
+                                    }
+                                );
+                            });
+                        }
+                    );
+                });
+            }
+        );
+    });
+
+    // Supprimer une tâche (Team Leader uniquement) — cascade : assignations,
+    // commentaires et livrables rattachés sont supprimés par la base.
+    router.delete("/tasks/:id", (req, res) => {
+        const userId = req.session.userId;
+        const taskId = req.params.id;
+
+        db.query(
+            "SELECT j.id_groupe FROM Tache t JOIN Jalon j ON j.id_jalon = t.id_jalon WHERE t.id_tache = ?",
+            [taskId],
+            (err, rows) => {
+                if (err) return res.status(500).json({ success: false, error: err.message });
+                if (rows.length === 0) return res.status(404).json({ success: false, message: "Tâche introuvable" });
+
+                isMember(userId, rows[0].id_groupe, (e2, info) => {
+                    if (e2) return res.status(500).json({ success: false, error: e2.message });
+                    if (!info.isLeader) return res.status(403).json({ success: false, message: "Réservé au Team Leader" });
+
+                    db.query("DELETE FROM Tache WHERE id_tache = ?", [taskId], (e3) => {
+                        if (e3) return res.status(500).json({ success: false, error: e3.message });
+                        res.json({ success: true });
+                    });
+                });
+            }
+        );
     });
 
     /* ============================================================
@@ -623,7 +908,99 @@ module.exports = function (db) {
                 `;
                 db.query(sql, [nom || req.file.originalname, req.file.filename, id_tache || null, id_groupe || null, userId], (err3, result) => {
                     if (err3) return res.status(500).json({ success: false, error: err3.message });
-                    res.json({ success: true, id_livrable: result.insertId });
+                    // Notifier les autres membres du groupe (type 'livrable')
+                    groupAudience(groupId, userId, (eA, idProjet, others) => {
+                        const label = nom || req.file.originalname;
+                        notify(others, `Nouveau livrable déposé : ${label}`, "livrable", idProjet, () => {
+                            res.json({ success: true, id_livrable: result.insertId });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    // Supprimer un livrable (le déposant ou le Team Leader) — permet la
+    // « mise à jour » d'un livrable en re-déposant une nouvelle version.
+    router.delete("/deliverables/:id", (req, res) => {
+        const userId = req.session.userId;
+        const livId = req.params.id;
+
+        // Retrouver le groupe + le déposant du livrable
+        const sql = `
+            SELECT l.id_etudiant_deposant,
+                   COALESCE(l.id_groupe, gp.id_groupe) AS id_groupe
+            FROM Livrable l
+            LEFT JOIN Tache t  ON t.id_tache = l.id_tache
+            LEFT JOIN Jalon j  ON j.id_jalon = t.id_jalon
+            LEFT JOIN Groupe gp ON gp.id_groupe = j.id_groupe
+            WHERE l.id_livrable = ?
+        `;
+        db.query(sql, [livId], (err, rows) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (rows.length === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+            const { id_etudiant_deposant, id_groupe } = rows[0];
+
+            isMember(userId, id_groupe, (e2, info) => {
+                if (e2) return res.status(500).json({ success: false, error: e2.message });
+                const isOwner = String(id_etudiant_deposant) === String(userId);
+                if (!isOwner && !info.isLeader) {
+                    return res.status(403).json({ success: false, message: "Seul le déposant ou le Team Leader peut supprimer ce livrable" });
+                }
+                db.query("DELETE FROM Livrable WHERE id_livrable = ?", [livId], (e3) => {
+                    if (e3) return res.status(500).json({ success: false, error: e3.message });
+                    res.json({ success: true });
+                });
+            });
+        });
+    });
+
+    /* ============================================================
+       LIVRAISON (Étape 8) — le Team Leader marque le groupe « Livré »
+       quand tous les livrables finaux ont été déposés.
+       Autorisé depuis En_cours / En_retard uniquement.
+    ============================================================ */
+    router.post("/groups/:groupId/deliver", (req, res) => {
+        const userId = req.session.userId;
+        const groupId = req.params.groupId;
+
+        isMember(userId, groupId, (err, info) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (!info.isLeader) return res.status(403).json({ success: false, message: "Réservé au Team Leader" });
+
+            db.query("SELECT etat, id_projet FROM Groupe WHERE id_groupe = ?", [groupId], (e1, gRows) => {
+                if (e1) return res.status(500).json({ success: false, error: e1.message });
+                if (gRows.length === 0) return res.status(404).json({ success: false, message: "Groupe introuvable" });
+
+                const etat = gRows[0].etat;
+                const idProjet = gRows[0].id_projet;
+                if (!["En_cours", "En_retard"].includes(etat)) {
+                    return res.status(409).json({ success: false, message: "Le groupe ne peut être marqué « Livré » que depuis l'état En cours / En retard" });
+                }
+
+                // Au moins un livrable doit exister (tâche ou groupe) avant de livrer
+                const sqlHasDeliv = `
+                    SELECT COUNT(*) AS n
+                    FROM Livrable l
+                    LEFT JOIN Tache t ON t.id_tache = l.id_tache
+                    LEFT JOIN Jalon j ON j.id_jalon = t.id_jalon
+                    WHERE l.id_groupe = ? OR j.id_groupe = ?
+                `;
+                db.query(sqlHasDeliv, [groupId, groupId], (e2, dRows) => {
+                    if (e2) return res.status(500).json({ success: false, error: e2.message });
+                    if (!dRows[0].n) {
+                        return res.status(400).json({ success: false, message: "Déposez au moins un livrable avant de marquer le groupe comme livré" });
+                    }
+
+                    db.query("UPDATE Groupe SET etat = 'Livre' WHERE id_groupe = ?", [groupId], (e3) => {
+                        if (e3) return res.status(500).json({ success: false, error: e3.message });
+                        // Prévenir tout le groupe
+                        groupAudience(groupId, null, (eA, idProj, members) => {
+                            notify(members, "Le groupe a été marqué « Livré »", "systeme", idProj || idProjet, () => {
+                                res.json({ success: true, etat: "Livre" });
+                            });
+                        });
+                    });
                 });
             });
         });
@@ -741,6 +1118,8 @@ module.exports = function (db) {
                 [contenu, userId, groupId],
                 (err, result) => {
                     if (err) return res.status(500).json({ success: false, error: err.message });
+                    // NB : on ne crée PAS de notification par message de chat (ce serait
+                    // du bruit). Le chat se consulte directement dans l'onglet Chat.
                     res.json({ success: true, id_message: result.insertId });
                 }
             );
@@ -836,10 +1215,11 @@ module.exports = function (db) {
             if (err) return res.status(500).json({ success: false, error: err.message });
             if (results.length === 0) return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
 
-            const match = await bcrypt.compare(oldPassword, results[0].mot_de_passe);
+            // comparePassword gère le fallback "mot de passe en clair" (phase dev)
+            const match = await comparePassword(oldPassword, results[0].mot_de_passe);
             if (!match) return res.status(401).json({ success: false, message: "Ancien mot de passe incorrect" });
 
-            const hashed = await bcrypt.hash(newPassword, 10);
+            const hashed = await hashPassword(newPassword);
             db.query("UPDATE Utilisateur SET mot_de_passe = ? WHERE id_utilisateur = ?", [hashed, userId], (err) => {
                 if (err) return res.status(500).json({ success: false, error: err.message });
                 res.json({ success: true });

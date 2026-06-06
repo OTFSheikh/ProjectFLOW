@@ -6,6 +6,7 @@ const cors = require("cors");
 const session = require("express-session");
 const path = require("path");
 const crypto = require("crypto");
+const os = require("os");
 const { hashPassword, comparePassword } = require("./utils/password");
 const adminRoutes = require("./routes/admin");
 const encadrantRoutes = require("./routes/encadrant");
@@ -68,24 +69,37 @@ db.connect((err) => {
 ----------------------------------
 MODE SANS CONNEXION (DEV)
 Injecte automatiquement une session étudiant si aucune session active.
-À retirer quand l'équipe remettra l'authentification.
+DÉSACTIVÉ par défaut : pour le chat multi-utilisateurs sur le même WiFi,
+chaque personne doit se connecter avec SON propre compte (sinon tout le monde
+serait vu comme le même étudiant démo).
+Pour réactiver le mode démo solo : mettre DEV_AUTO_LOGIN=true dans le .env
 ----------------------------------
 */
+const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "true";
+
 app.use((req, res, next) => {
-    if (!req.session.userId && defaultEtudiantId) {
+    if (DEV_AUTO_LOGIN && !req.session.userId && defaultEtudiantId) {
         req.session.userId = defaultEtudiantId;
         req.session.role = "etudiant";
     }
     next();
 });
 
-// La racine ouvre directement l'espace étudiant
+// La racine : espace étudiant si mode démo, sinon page de connexion
 app.get("/", (req, res) => {
-    res.redirect("/etudiant/dashboard-student.html");
+    if (DEV_AUTO_LOGIN) {
+        return res.redirect("/etudiant/dashboard-student.html");
+    }
+    res.redirect("/login.html");
 });
 
 app.use(express.static(path.join(__dirname, "public")));
+// Les fichiers sont rangés dans uploads/sujets et uploads/livrables, mais le
+// front construit les URLs sous la forme /uploads/<fichier>. On ajoute donc un
+// "fallthrough" sur les sous-dossiers pour que /uploads/<fichier> les retrouve.
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads", "sujets")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads", "livrables")));
 
 /*
 ----------------------------------
@@ -242,10 +256,34 @@ app.use("/api/etudiant", etudiantRoutes(db));
 
 /*
 ----------------------------------
-Lancement serveur
+Lancement serveur (écoute sur tout le réseau pour l'accès WiFi local)
 ----------------------------------
 */
 
-app.listen(process.env.PORT || 5000, () => {
-    console.log(`Serveur démarré sur http://localhost:${process.env.PORT || 5000}`);
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, "0.0.0.0", () => {
+    console.log("============================================================");
+    console.log(`  ProjectFLOW démarré sur le port ${PORT}`);
+    console.log("------------------------------------------------------------");
+    console.log(`  Sur cette machine : http://localhost:${PORT}`);
+
+    // Affiche les adresses IP du réseau local (pour les autres machines en WiFi)
+    const nets = os.networkInterfaces();
+    const addresses = [];
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name] || []) {
+            if (net.family === "IPv4" && !net.internal) {
+                addresses.push(net.address);
+            }
+        }
+    }
+    if (addresses.length) {
+        console.log("  Pour les autres (même WiFi) :");
+        addresses.forEach((ip) => console.log(`      http://${ip}:${PORT}`));
+    } else {
+        console.log("  (Aucune IP réseau détectée — vérifie ta connexion WiFi)");
+    }
+    console.log(`  Auto-login démo : ${DEV_AUTO_LOGIN ? "ACTIVÉ" : "désactivé (connexion par compte)"}`);
+    console.log("============================================================");
 });

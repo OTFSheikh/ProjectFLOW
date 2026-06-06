@@ -433,8 +433,10 @@ module.exports = function (db) {
     });
 
     router.patch("/deliverables/:id/validate", (req, res) => {
-        const { statut, commentaire } = req.body;
-        const validStatuts = ["Valide", "Rejete"];
+        let { statut, commentaire } = req.body;
+        // Le front étudiant attend 'Valide' / 'Refuse'. On tolère l'ancien 'Rejete'.
+        if (statut === "Rejete") statut = "Refuse";
+        const validStatuts = ["Valide", "Refuse"];
         if (!validStatuts.includes(statut)) {
             return res.status(400).json({ success: false, message: "Statut invalide" });
         }
@@ -445,7 +447,34 @@ module.exports = function (db) {
             (err, result) => {
                 if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
                 if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
-                res.json({ success: true, message: "Livrable mis à jour" });
+
+                // Notifier l'étudiant qui a déposé le livrable (feedback encadrant)
+                const sqlInfo = `
+                    SELECT l.nom, l.id_etudiant_deposant,
+                           COALESCE(g.id_projet, gp.id_projet) AS id_projet
+                    FROM Livrable l
+                    LEFT JOIN Groupe g  ON g.id_groupe = l.id_groupe
+                    LEFT JOIN Tache t   ON t.id_tache = l.id_tache
+                    LEFT JOIN Jalon j   ON j.id_jalon = t.id_jalon
+                    LEFT JOIN Groupe gp ON gp.id_groupe = j.id_groupe
+                    WHERE l.id_livrable = ?
+                `;
+                db.query(sqlInfo, [req.params.id], (e2, rows) => {
+                    if (!e2 && rows.length) {
+                        const r = rows[0];
+                        const type = statut === "Valide" ? "validation" : "refus";
+                        const contenu = statut === "Valide"
+                            ? `Votre livrable « ${r.nom} » a été validé`
+                            : `Votre livrable « ${r.nom} » a été refusé — à corriger`;
+                        db.query(
+                            "INSERT INTO Notification (contenu, type, id_projet, id_utilisateur) VALUES (?, ?, ?, ?)",
+                            [contenu, type, r.id_projet || null, r.id_etudiant_deposant],
+                            () => res.json({ success: true, message: "Livrable mis à jour" })
+                        );
+                    } else {
+                        res.json({ success: true, message: "Livrable mis à jour" });
+                    }
+                });
             }
         );
     });

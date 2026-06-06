@@ -805,7 +805,10 @@
             <div id="tab-deliverables" class="tab-content">
                 <div style="display:flex; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
                     <div class="filters-row" id="delivFilters"></div>
-                    <button class="btn btn-primary" id="btnDeposit"><i class="fas fa-plus"></i> Déposer un livrable</button>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button class="btn btn-secondary" id="btnDeliver" style="display:none;"><i class="fas fa-flag-checkered"></i> Marquer comme Livré</button>
+                        <button class="btn btn-primary" id="btnDeposit"><i class="fas fa-plus"></i> Déposer un livrable</button>
+                    </div>
                 </div>
                 <div id="delivContainer"></div>
             </div>
@@ -916,7 +919,7 @@
 
     const state = {
         project: null, group: null, members: [], isTeamLeader: false,
-        myUserId: null, groupId: null,
+        myUserId: null, groupId: null, projectId: null,
         jalons: [], tasks: [],
         deliverables: [], delivValid: 0, delivTotal: 0,
         taskFilter: "all", taskJalonId: null
@@ -967,11 +970,21 @@
     }
 
     /* ---------- Onglets ---------- */
+    let chatPollTimer = null;
     function switchTab(tabName, btn) {
         document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
         document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById("tab-" + tabName).classList.add("active");
+
+        // Chat « live » : on recharge à l'ouverture de l'onglet Chat, puis toutes
+        // les 4 secondes (les messages des autres apparaissent tout seuls).
+        // Le polling s'arrête dès qu'on quitte l'onglet Chat.
+        if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+        if (tabName === "chat") {
+            loadChat();
+            chatPollTimer = setInterval(loadChat, 4000);
+        }
     }
 
     /* ---------- Rôle Team Leader vs Membre (piloté par le backend) ---------- */
@@ -1017,13 +1030,87 @@
 
     function renderSubject() {
         const g = state.group;
-        const card = (g && g.sujet_titre) ? `
-            <div class="card">
-                <div class="card-title">Sujet choisi : ${esc(g.sujet_titre)}</div>
-                <p style="color:var(--gray-700); font-size:0.88rem; line-height:1.6;">${esc(g.sujet_description || "Aucune description fournie.")}</p>
-            </div>` : `
-            <div class="card"><div class="empty-state">Aucun sujet choisi pour ce groupe pour le moment.</div></div>`;
-        document.getElementById("subjectContent").innerHTML = card + `<div id="subjectDocs"></div>`;
+        // 1) Un sujet est déjà choisi -> on l'affiche.
+        if (g && g.sujet_titre) {
+            const card = `
+                <div class="card">
+                    <div class="card-title">Sujet choisi : ${esc(g.sujet_titre)}</div>
+                    <p style="color:var(--gray-700); font-size:0.88rem; line-height:1.6;">${esc(g.sujet_description || "Aucune description fournie.")}</p>
+                </div>`;
+            document.getElementById("subjectContent").innerHTML = card + `<div id="subjectDocs"></div>`;
+            loadSubjectDocuments();
+            return;
+        }
+        // 2) Aucun sujet choisi -> on va chercher les sujets disponibles du projet.
+        document.getElementById("subjectContent").innerHTML =
+            `<div class="card"><div class="empty-state">Chargement des sujets…</div></div><div id="subjectDocs"></div>`;
+        loadAvailableSubjects();
+        loadSubjectDocuments();
+    }
+
+    // Liste des sujets disponibles + bouton « Choisir » (réservé au Team Leader,
+    // tant que le groupe est « Proposé »). Étape 4 du flow.
+    async function loadAvailableSubjects() {
+        const { ok, data } = await api("GET", `/projects/${state.projectId}/subjects`);
+        const host = document.getElementById("subjectContent");
+        if (!ok) {
+            host.innerHTML = `<div class="card"><div class="empty-state">Impossible de charger les sujets.</div></div><div id="subjectDocs"></div>`;
+            return;
+        }
+        const subjects = data.subjects || [];
+        const canChoose = state.isTeamLeader && data.etat_groupe === "Propose";
+
+        if (!subjects.length) {
+            host.innerHTML = `<div class="card"><div class="empty-state">Aucun sujet n'a été rattaché à ce projet par l'encadrant.</div></div><div id="subjectDocs"></div>`;
+            return;
+        }
+
+        const intro = canChoose
+            ? `<p style="color:var(--gray-600); font-size:0.85rem; margin-bottom:0.8rem;"><i class="fas fa-info-circle"></i> En tant que Team Leader, choisissez le sujet de votre groupe. Ce choix n'est possible que tant que le groupe est « Proposé ».</p>`
+            : (state.isTeamLeader
+                ? `<p style="color:var(--gray-600); font-size:0.85rem; margin-bottom:0.8rem;"><i class="fas fa-info-circle"></i> Le sujet ne peut plus être modifié (le travail a déjà démarré).</p>`
+                : `<p style="color:var(--gray-600); font-size:0.85rem; margin-bottom:0.8rem;"><i class="fas fa-info-circle"></i> En attente que le Team Leader choisisse le sujet du groupe.</p>`);
+
+        const cards = subjects.map(s => `
+            <div class="card" style="margin-bottom:0.8rem;">
+                <div class="card-title">${esc(s.titre)}</div>
+                <p style="color:var(--gray-700); font-size:0.88rem; line-height:1.6;">${esc(s.description || "Aucune description fournie.")}</p>
+                <div style="font-size:0.75rem; color:var(--gray-500); margin-top:0.4rem;"><i class="fas fa-paperclip"></i> ${s.nb_documents || 0} document(s) de consignes</div>
+                ${canChoose ? `<div style="margin-top:0.8rem;"><button class="btn btn-primary" onclick="chooseSubject(${s.id_sujet})"><i class="fas fa-check"></i> Choisir ce sujet</button></div>` : ""}
+            </div>`).join("");
+
+        host.innerHTML = `<div>${intro}${cards}</div><div id="subjectDocs"></div>`;
+    }
+
+    // Le Team Leader choisit le sujet du groupe (Étape 4).
+    async function chooseSubject(idSujet) {
+        if (!confirm("Confirmer le choix de ce sujet pour le groupe ?")) return;
+        const { ok, data, status } = await api("POST", `/groups/${state.groupId}/subject`, { id_sujet: idSujet });
+        if (ok) {
+            location.reload();
+        } else {
+            alert((data && data.message) || "Choix impossible (statut " + status + ").");
+        }
+    }
+
+    // Bouton « Marquer comme Livré » : visible seulement pour le TL d'un groupe
+    // En cours / En retard (Étape 8).
+    function updateDeliverButton() {
+        const b = document.getElementById("btnDeliver");
+        if (!b) return;
+        const etat = state.group ? state.group.etat : "";
+        const show = state.isTeamLeader && (etat === "En_cours" || etat === "En_retard");
+        b.style.display = show ? "" : "none";
+    }
+
+    async function markDelivered() {
+        if (!confirm("Marquer le groupe comme « Livré » ?\nCela indique que tous les livrables finaux ont été déposés.")) return;
+        const { ok, data, status } = await api("POST", `/groups/${state.groupId}/deliver`);
+        if (ok) {
+            location.reload();
+        } else {
+            alert((data && data.message) || "Action impossible (statut " + status + ").");
+        }
     }
 
     // Documents de consignes déposés par l'encadrant
@@ -1144,6 +1231,7 @@
                     <span class="date ${late ? "late" : ""}">${t.date ? fmtShort(t.date) : ""}${late ? " (En retard)" : ""}</span>
                     <button class="icon-btn" title="Commenter" data-comment-task="${t.id_tache}"><i class="fas fa-comment"></i></button>
                     <button class="icon-btn" title="Déposer un livrable" data-deposit-task="${t.id_tache}"><i class="fas fa-paperclip"></i></button>
+                    <button class="icon-btn danger" title="Supprimer la tâche" data-del-task="${t.id_tache}" data-tl-only><i class="fas fa-trash"></i></button>
                 </div>`;
             }).join("") || `<div class="empty-state" style="padding:0.75rem;">Aucune tâche${f !== "all" ? " pour ce filtre" : ""}.</div>`;
             return `<div class="jalon-card">
@@ -1187,6 +1275,14 @@
         document.querySelectorAll("[data-new-task]").forEach(b => b.onclick = () => openTaskModal(b.dataset.newTask));
         document.querySelectorAll("[data-comment-task]").forEach(b => b.onclick = () => commentTask(b.dataset.commentTask));
         document.querySelectorAll("[data-deposit-task]").forEach(b => b.onclick = () => openDepositModal(b.dataset.depositTask, null));
+        document.querySelectorAll("[data-del-task]").forEach(b => b.onclick = () => deleteTask(b.dataset.delTask));
+    }
+
+    async function deleteTask(id) {
+        if (!confirm("Supprimer cette tâche ?\n(Les commentaires et livrables liés seront aussi supprimés.)")) return;
+        const { ok, status, data } = await api("DELETE", `/tasks/${id}`);
+        if (ok) loadMilestones();
+        else alert((data && data.message) || (status === 403 ? "Réservé au Team Leader." : "Erreur."));
     }
 
     function newJalon() {
@@ -1313,6 +1409,7 @@
         const keep = d => filter === "all" || d.statut_validation === filter;
         const card = d => {
             const meta = VALID_BADGE[d.statut_validation] || ["badge-gray", "fa-file", d.statut_validation || ""];
+            const canDel = state.isTeamLeader || String(d.id_etudiant_deposant) === String(state.myUserId);
             const refused = d.statut_validation === "Refuse" ? `
                 <div class="deliv-refused-block">
                     <div class="refused-text">
@@ -1330,7 +1427,9 @@
                     </div>
                     <div style="display:flex; gap:0.5rem; align-items:center;">
                         <span class="badge ${meta[0]}"><i class="fas ${meta[1]}"></i> ${meta[2]}</span>
+                        ${d.chemin_fichier ? `<a class="icon-btn" title="Télécharger" href="/uploads/${esc(d.chemin_fichier)}" target="_blank"><i class="fas fa-download"></i></a>` : ""}
                         <button class="icon-btn" title="Commenter" data-comment-deliv="${d.id_livrable}"><i class="fas fa-comment"></i></button>
+                        ${canDel ? `<button class="icon-btn" title="Supprimer" data-del-deliv="${d.id_livrable}"><i class="fas fa-trash"></i></button>` : ""}
                     </div>
                 </div>${refused}
             </div>`;
@@ -1350,6 +1449,14 @@
             </div>`;
         document.querySelectorAll("[data-comment-deliv]").forEach(b => b.onclick = () => commentDeliv(b.dataset.commentDeliv));
         document.querySelectorAll("[data-redep-task]").forEach(b => b.onclick = () => openDepositModal(b.dataset.redepTask || null, b.dataset.redepGroup || null));
+        document.querySelectorAll("[data-del-deliv]").forEach(b => b.onclick = () => deleteDeliverable(b.dataset.delDeliv));
+    }
+
+    async function deleteDeliverable(id) {
+        if (!confirm("Supprimer ce livrable ? (Vous pourrez en redéposer un nouveau.)")) return;
+        const { ok, data, status } = await api("DELETE", `/deliverables/${id}`);
+        if (ok) { loadDeliverables(); }
+        else alert((data && data.message) || "Suppression impossible (statut " + status + ").");
     }
 
     async function commentDeliv(id) {
@@ -1421,6 +1528,8 @@
     }
     function renderMessages(msgs) {
         const c = document.getElementById("chatMessages");
+        // Avant de redessiner, on regarde si l'utilisateur est déjà en bas du fil.
+        const nearBottom = (c.scrollHeight - c.scrollTop - c.clientHeight) < 60;
         c.innerHTML = msgs.map(m => {
             const me = String(m.id_utilisateur) === String(state.myUserId);
             const isEnc = !!m.est_encadrant;
@@ -1434,7 +1543,8 @@
                 </div>
             </div>`;
         }).join("") || `<div class="empty-state">Aucun message. Démarrez la conversation !</div>`;
-        c.scrollTop = c.scrollHeight;
+        // On ne ramène en bas que si on y était déjà (ne gêne pas la lecture de l'historique).
+        if (nearBottom) c.scrollTop = c.scrollHeight;
     }
     async function sendMessage() {
         const ta = document.getElementById("chatInput");
@@ -1503,13 +1613,14 @@
         state.group = data.group;
         state.members = data.members || [];
         state.groupId = data.group.id_groupe;
+        state.projectId = data.project.id_projet;
         state.isTeamLeader = !!data.isTeamLeader;
 
         applyRole(state.isTeamLeader);
         renderHeader();
+        updateDeliverButton();
         renderSubject();
 
-        loadSubjectDocuments();
         loadEvaluation();
         loadOverviewActivity();
         loadMilestones();
@@ -1521,6 +1632,7 @@
     document.getElementById("btnNewJalon").onclick = newJalon;
     document.getElementById("btnDeposit").onclick = () => openDepositModal(null, state.groupId);
     document.getElementById("btnSendMsg").onclick = sendMessage;
+    document.getElementById("btnDeliver").onclick = markDelivered;
     document.querySelectorAll("#taskFilters .filter-chip").forEach(chip => {
         chip.onclick = () => {
             document.querySelectorAll("#taskFilters .filter-chip").forEach(c => c.classList.remove("active"));

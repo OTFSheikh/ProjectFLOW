@@ -136,9 +136,11 @@ CREATE TABLE Message (
 CREATE TABLE Notification (
   id_notification INT AUTO_INCREMENT NOT NULL,
   contenu TEXT NOT NULL,
+  type VARCHAR(50) NOT NULL DEFAULT 'systeme',
   date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
   lu BOOLEAN NOT NULL DEFAULT FALSE,
   id_utilisateur INT NOT NULL,
+  id_projet INT NULL,
   PRIMARY KEY (id_notification)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -204,6 +206,7 @@ ALTER TABLE Message ADD CONSTRAINT fk_message_utilisateur FOREIGN KEY (id_utilis
 ALTER TABLE Message ADD CONSTRAINT fk_message_groupe FOREIGN KEY (id_groupe) REFERENCES Groupe (id_groupe) ON DELETE CASCADE;
 
 ALTER TABLE Notification ADD CONSTRAINT fk_notification_utilisateur FOREIGN KEY (id_utilisateur) REFERENCES Utilisateur (id_utilisateur) ON DELETE CASCADE;
+ALTER TABLE Notification ADD CONSTRAINT fk_notification_projet FOREIGN KEY (id_projet) REFERENCES Projet (id_projet) ON DELETE CASCADE;
 
 ALTER TABLE Critere_evaluation ADD CONSTRAINT fk_critere_projet FOREIGN KEY (id_projet) REFERENCES Projet (id_projet) ON DELETE CASCADE;
 
@@ -257,3 +260,12 @@ INSERT INTO Utilisateur (
 
 -- ALTER TABLE Projet ADD COLUMN promo VARCHAR(50) NULL AFTER etat;
 -- ALTER TABLE Note_entrevue ADD COLUMN titre VARCHAR(150) NULL AFTER id_note;
+
+-- ============================================================
+-- Migration : colonnes type + id_projet sur Notification
+-- (à exécuter sur une base existante, sinon déjà inclus ci-dessus)
+-- ============================================================
+
+-- ALTER TABLE Notification ADD COLUMN type VARCHAR(50) NOT NULL DEFAULT 'systeme' AFTER contenu;
+-- ALTER TABLE Notification ADD COLUMN id_projet INT NULL AFTER id_utilisateur;
+-- ALTER TABLE Notification ADD CONSTRAINT fk_notification_projet FOREIGN KEY (id_projet) REFERENCES Projet (id_projet) ON DELETE CASCADE;
