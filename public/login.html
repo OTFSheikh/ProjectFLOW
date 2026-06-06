@@ -243,6 +243,22 @@
             font-size: 0.95rem;
         }
 
+        /* Message d'erreur de connexion */
+        .login-error {
+            position: relative;
+            z-index: 1;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.45);
+            color: #fecaca;
+            padding: 0.8rem 1rem;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            margin-bottom: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
         /* Form */
         .login-form {
             display: flex;
@@ -425,6 +441,12 @@
             transform: translateY(-1px);
         }
 
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .submit-btn i {
             font-size: 1.1rem;
             color: white;
@@ -516,6 +538,12 @@
                 <p>Entrez vos identifiants pour accéder à votre compte</p>
             </div>
 
+            <!-- Message d'erreur (affiché si la connexion échoue) -->
+            <div id="loginError" class="login-error" style="display:none;">
+                <i class="fas fa-exclamation-circle"></i>
+                <span id="loginErrorText"></span>
+            </div>
+
             <form id="loginForm" class="login-form">
                 <!-- Email -->
                 <div class="input-wrapper">
@@ -570,6 +598,23 @@
     <script>
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
+        const errorBox = document.getElementById('loginError');
+        const errorText = document.getElementById('loginErrorText');
+
+        // Où envoyer l'utilisateur selon son rôle (déterminé par le backend)
+        const ROLE_ROUTES = {
+            etudiant: '/etudiant/dashboard-student.html',
+            encadrant: '/encadrant/dashboard.html',
+            admin: '/admin/dashboard.html'
+        };
+
+        function showError(message) {
+            errorText.textContent = message || "Connexion impossible. Réessaie.";
+            errorBox.style.display = 'flex';
+        }
+        function hideError() {
+            errorBox.style.display = 'none';
+        }
 
         togglePassword.addEventListener('click', () => {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -580,12 +625,14 @@
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            hideError();
 
             const email = document.getElementById('email').value.trim();
             const password = passwordInput.value;
             const rememberMe = document.getElementById('rememberMe').checked;
 
             if (!email || !password) {
+                showError("Merci de renseigner votre email et votre mot de passe.");
                 return;
             }
 
@@ -595,6 +642,7 @@
             submitBtn.disabled = true;
 
             try {
+                // Le rôle n'est PAS envoyé : le backend le déduit de la base.
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -605,34 +653,35 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    const loginData = {
-                        email: data.utilisateur.email,
-                        timestamp: new Date().toISOString()
-                    };
-
+                    // Mémoriser l'email pour le pré-remplissage (optionnel)
+                    const loginData = { email: data.utilisateur.email, timestamp: new Date().toISOString() };
                     if (rememberMe) {
                         localStorage.setItem('projectflow_login', JSON.stringify(loginData));
                     } else {
+                        localStorage.removeItem('projectflow_login');
                         sessionStorage.setItem('projectflow_login', JSON.stringify(loginData));
                     }
 
-                    submitBtn.innerHTML = '<i class="fas fa-check"></i><span>Bienvenue!</span>';
+                    submitBtn.innerHTML = '<i class="fas fa-check"></i><span>Bienvenue !</span>';
                     submitBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
 
-                    setTimeout(() => {
-                        window.location.href = '/dashboard.html';
-                    }, 1500);
+                    // Redirection selon le rôle renvoyé par le backend
+                    const dest = ROLE_ROUTES[data.role] || ROLE_ROUTES.etudiant;
+                    setTimeout(() => { window.location.href = dest; }, 1000);
                 } else {
+                    showError(data.message || "Identifiants incorrects.");
                     submitBtn.innerHTML = originalContent;
                     submitBtn.disabled = false;
                 }
             } catch (error) {
                 console.error(error);
+                showError("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
                 submitBtn.innerHTML = originalContent;
                 submitBtn.disabled = false;
             }
         });
 
+        // Pré-remplissage de l'email si "Rester connecté" avait été coché
         window.addEventListener('load', () => {
             const savedLogin = localStorage.getItem('projectflow_login');
             if (savedLogin) {

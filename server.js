@@ -108,12 +108,13 @@ AUTHENTIFICATION
 */
 
 app.post("/api/auth/login", (req, res) => {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
 
-    if (!email || !password || !role) {
+    // Le rôle n'est plus demandé au client : il est déduit de la base de données.
+    if (!email || !password) {
         return res.status(400).json({
             success: false,
-            message: "Tous les champs sont obligatoires"
+            message: "Email et mot de passe obligatoires"
         });
     }
 
@@ -140,6 +141,7 @@ app.post("/api/auth/login", (req, res) => {
                 return res.status(401).json({ success: false, message: "Mot de passe incorrect" });
             }
 
+            // Rôle déterminé uniquement à partir de la base
             let dbRole = "";
             if (user.est_admin === 1) {
                 dbRole = "admin";
@@ -147,10 +149,6 @@ app.post("/api/auth/login", (req, res) => {
                 dbRole = "encadrant";
             } else {
                 dbRole = "etudiant";
-            }
-
-            if (role !== dbRole) {
-                return res.status(403).json({ success: false, message: "Le rôle sélectionné est incorrect" });
             }
 
             req.session.userId = user.id_utilisateur;
