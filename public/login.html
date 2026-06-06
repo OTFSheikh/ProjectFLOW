@@ -273,7 +273,7 @@
             position: relative;
         }
 
-        .input-wrapper i {
+        .input-wrapper > i {
             position: absolute;
             left: 1rem;
             top: 50%;
@@ -306,11 +306,7 @@
             box-shadow: 0 0 0 4px rgba(255, 137, 4, 0.15);
         }
 
-        .input-wrapper input:focus + i {
-            color: var(--primary);
-        }
-
-        .input-wrapper:focus-within i {
+        .input-wrapper:focus-within > i {
             color: var(--primary);
         }
 
