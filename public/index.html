@@ -104,16 +104,17 @@
             position: fixed;
             top: 0;
             width: 100%;
-            background: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             z-index: 1000;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
+            border-bottom: 1px solid var(--gray-200);
+            transition: box-shadow 0.3s ease;
         }
 
         nav.scrolled {
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            background: var(--white);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
 
         .nav-container {
@@ -1287,7 +1288,9 @@
                 if (target) {
                     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-                navMenu.style.display = 'none';
+                if (window.innerWidth <= 900) {
+                    navMenu.style.display = 'none';
+                }
             });
         });
 

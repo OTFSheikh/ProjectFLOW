@@ -85,12 +85,8 @@ app.use((req, res, next) => {
     next();
 });
 
-// La racine : espace étudiant si mode démo, sinon page de connexion
 app.get("/", (req, res) => {
-    if (DEV_AUTO_LOGIN) {
-        return res.redirect("/etudiant/dashboard-student.html");
-    }
-    res.redirect("/login.html");
+    res.redirect("/index.html");
 });
 
 app.use(express.static(path.join(__dirname, "public")));
