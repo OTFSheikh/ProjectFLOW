@@ -237,6 +237,9 @@ CREATE TABLE Note_entrevue (
 
 ALTER TABLE Utilisateur ADD COLUMN token_activation VARCHAR(64) NULL;
 ALTER TABLE Utilisateur ADD COLUMN token_expiration DATETIME NULL;
+-- Réinitialisation de mot de passe (mot de passe oublié)
+ALTER TABLE Utilisateur ADD COLUMN token_reset VARCHAR(64) NULL;
+ALTER TABLE Utilisateur ADD COLUMN token_reset_expiration DATETIME NULL;
 
 -- ============================================================
 -- Admin initial (seed)

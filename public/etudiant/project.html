@@ -887,6 +887,7 @@
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="sidebar.js"></script>
     <script>
     /* ============================================================
@@ -922,7 +923,8 @@
         myUserId: null, groupId: null, projectId: null,
         jalons: [], tasks: [],
         deliverables: [], delivValid: 0, delivTotal: 0,
-        taskFilter: "all", taskJalonId: null
+        taskFilter: "all", taskJalonId: null,
+        chatMessages: []
     };
 
     /* ---------- Constantes d'affichage (enums de la doc) ---------- */
@@ -970,20 +972,16 @@
     }
 
     /* ---------- Onglets ---------- */
-    let chatPollTimer = null;
     function switchTab(tabName, btn) {
         document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
         document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById("tab-" + tabName).classList.add("active");
 
-        // Chat « live » : on recharge à l'ouverture de l'onglet Chat, puis toutes
-        // les 4 secondes (les messages des autres apparaissent tout seuls).
-        // Le polling s'arrête dès qu'on quitte l'onglet Chat.
-        if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+        // Chat temps réel via WebSocket : on recharge l'historique à l'ouverture
+        // de l'onglet, les nouveaux messages arrivent ensuite en direct (socket).
         if (tabName === "chat") {
             loadChat();
-            chatPollTimer = setInterval(loadChat, 4000);
         }
     }
 
@@ -1498,13 +1496,34 @@
     };
 
     /* ============================================================
-       CHAT
+       CHAT (temps réel via WebSocket)
     ============================================================ */
+    let chatSocket = null;
+    function setupChatSocket() {
+        if (chatSocket || typeof io === "undefined" || !state.groupId) return;
+        chatSocket = io({ withCredentials: true });
+        chatSocket.on("connect", () => {
+            chatSocket.emit("join-group", state.groupId);
+        });
+        chatSocket.on("new-message", pushMessage);
+        chatSocket.on("message-deleted", (d) => {
+            if (!d || String(d.id_groupe) !== String(state.groupId)) return;
+            state.chatMessages = state.chatMessages.filter(m => String(m.id_message) !== String(d.id_message));
+            renderMessages(state.chatMessages);
+        });
+    }
+    function pushMessage(m) {
+        if (!m || String(m.id_groupe) !== String(state.groupId)) return;
+        if (state.chatMessages.some(x => String(x.id_message) === String(m.id_message))) return;
+        state.chatMessages.push(m);
+        renderMessages(state.chatMessages);
+    }
     async function loadChat() {
         const { ok, data } = await api("GET", `/groups/${state.groupId}/messages`);
         if (!ok) return;
+        state.chatMessages = data.messages || [];
         renderParticipants();
-        renderMessages(data.messages || []);
+        renderMessages(state.chatMessages);
     }
     function renderParticipants() {
         const membersHtml = state.members.map(u => `
@@ -1535,10 +1554,11 @@
             const isEnc = !!m.est_encadrant;
             const badge = isEnc ? "badge-info" : (me ? "badge-primary" : "badge-gray");
             const role = isEnc ? "Encadrant" : (me ? "Team Leader / Vous" : "Membre");
+            const del = me ? ` · <button class="chat-del" data-mid="${m.id_message}" title="Supprimer mon message" style="border:none;background:none;color:var(--gray-400);cursor:pointer;font-size:0.7rem;padding:0;"><i class="fas fa-trash"></i></button>` : "";
             return `<div class="chat-message ${me ? "me" : ""}">
                 <div class="chat-msg-avatar">${esc(initials(m.prenom, m.nom))}</div>
                 <div class="chat-bubble-wrap">
-                    <div class="chat-bubble-header"><strong>${esc(m.prenom)} ${esc(m.nom)}</strong> · <span class="badge ${badge}" style="font-size:0.6rem; padding:1px 5px;">${role}</span> · ${fmtTime(m.date_envoi)}</div>
+                    <div class="chat-bubble-header"><strong>${esc(m.prenom)} ${esc(m.nom)}</strong> · <span class="badge ${badge}" style="font-size:0.6rem; padding:1px 5px;">${role}</span> · ${fmtTime(m.date_envoi)}${del}</div>
                     <div class="chat-bubble">${esc(m.contenu)}</div>
                 </div>
             </div>`;
@@ -1546,12 +1566,28 @@
         // On ne ramène en bas que si on y était déjà (ne gêne pas la lecture de l'historique).
         if (nearBottom) c.scrollTop = c.scrollHeight;
     }
+    async function deleteMessage(id) {
+        if (!confirm("Supprimer ce message ?")) return;
+        const { ok } = await api("DELETE", `/groups/${state.groupId}/messages/${id}`);
+        if (ok) {
+            // La suppression revient via le socket. Secours si socket déconnecté :
+            if (!chatSocket || !chatSocket.connected) {
+                state.chatMessages = state.chatMessages.filter(m => String(m.id_message) !== String(id));
+                renderMessages(state.chatMessages);
+            }
+        } else alert("Suppression impossible.");
+    }
     async function sendMessage() {
         const ta = document.getElementById("chatInput");
         const contenu = ta.value.trim();
         if (!contenu) return;
         const { ok } = await api("POST", `/groups/${state.groupId}/messages`, { contenu });
-        if (ok) { ta.value = ""; loadChat(); }
+        if (ok) {
+            ta.value = "";
+            // Le message revient en direct via le socket. En secours (socket
+            // déconnecté), on recharge le fil pour ne rien perdre.
+            if (!chatSocket || !chatSocket.connected) loadChat();
+        }
         else alert("Erreur lors de l'envoi.");
     }
 
@@ -1620,6 +1656,14 @@
         renderHeader();
         updateDeliverButton();
         renderSubject();
+
+        setupChatSocket();
+
+        // Délégation du clic sur les boutons "supprimer" (conteneur statique).
+        document.getElementById("chatMessages").addEventListener("click", (e) => {
+            const btn = e.target.closest(".chat-del");
+            if (btn) deleteMessage(btn.dataset.mid);
+        });
 
         loadEvaluation();
         loadOverviewActivity();

@@ -1,6 +1,8 @@
 require("dotenv").config();
 
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 const mysql = require("mysql2");
 const cors = require("cors");
 const session = require("express-session");
@@ -8,6 +10,7 @@ const path = require("path");
 const crypto = require("crypto");
 const os = require("os");
 const { hashPassword, comparePassword } = require("./utils/password");
+const { sendResetPasswordEmail } = require("./utils/mailer");
 const adminRoutes = require("./routes/admin");
 const encadrantRoutes = require("./routes/encadrant");
 const etudiantRoutes = require("./routes/etudiant");
@@ -17,7 +20,8 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-app.use(session({
+// Middleware de session partagé entre Express (HTTP) et Socket.IO (WebSocket).
+const sessionMiddleware = session({
     secret: process.env.SESSION_SECRET || "projectflow-dev-secret",
     resave: false,
     saveUninitialized: false,
@@ -25,7 +29,9 @@ app.use(session({
         maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true
     }
-}));
+});
+
+app.use(sessionMiddleware);
 
 /*
 ----------------------------------
@@ -50,6 +56,25 @@ db.connect((err) => {
         return;
     }
     console.log("MySQL connecté");
+
+    // Migration légère : s'assurer que les colonnes de réinitialisation existent.
+    // (ignore l'erreur "Duplicate column" si elles sont déjà présentes)
+    db.query(
+        "ALTER TABLE Utilisateur ADD COLUMN token_reset VARCHAR(64) NULL",
+        (e) => {
+            if (e && e.code !== "ER_DUP_FIELDNAME") {
+                console.warn("Migration token_reset:", e.code || e.message);
+            }
+        }
+    );
+    db.query(
+        "ALTER TABLE Utilisateur ADD COLUMN token_reset_expiration DATETIME NULL",
+        (e) => {
+            if (e && e.code !== "ER_DUP_FIELDNAME") {
+                console.warn("Migration token_reset_expiration:", e.code || e.message);
+            }
+        }
+    );
 
     // On résout une fois l'étudiant démo pour la session automatique
     db.query(
@@ -240,6 +265,108 @@ app.post("/api/auth/activate", (req, res) => {
 
 /*
 ----------------------------------
+MOT DE PASSE OUBLIÉ
+----------------------------------
+*/
+
+// Étape 1 : l'utilisateur demande un lien de réinitialisation
+app.post("/api/auth/forgot-password", (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ success: false, message: "Email obligatoire" });
+    }
+
+    // Réponse générique pour ne pas révéler si l'email existe (anti-énumération)
+    const genericResponse = {
+        success: true,
+        message: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé."
+    };
+
+    db.query(
+        "SELECT id_utilisateur, prenom, est_actif FROM Utilisateur WHERE email = ?",
+        [email],
+        (err, results) => {
+            if (err) {
+                return res.status(500).json({ success: false, message: "Erreur serveur" });
+            }
+
+            // Pas de compte (ou compte non activé) : on renvoie quand même la réponse générique
+            if (results.length === 0 || !results[0].est_actif) {
+                return res.json(genericResponse);
+            }
+
+            const user = results[0];
+            const token = crypto.randomBytes(32).toString("hex");
+            const expiration = new Date(Date.now() + 60 * 60 * 1000); // 1 heure
+
+            db.query(
+                "UPDATE Utilisateur SET token_reset = ?, token_reset_expiration = ? WHERE id_utilisateur = ?",
+                [token, expiration, user.id_utilisateur],
+                async (err2) => {
+                    if (err2) {
+                        return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    }
+                    try {
+                        await sendResetPasswordEmail(email, token, user.prenom);
+                    } catch (mailErr) {
+                        console.error("Erreur envoi email de réinitialisation:", mailErr);
+                    }
+                    return res.json(genericResponse);
+                }
+            );
+        }
+    );
+});
+
+// Étape 2 : l'utilisateur définit son nouveau mot de passe avec le token
+app.post("/api/auth/reset-password", (req, res) => {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+        return res.status(400).json({ success: false, message: "Token et mot de passe requis" });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ success: false, message: "Le mot de passe doit contenir au moins 6 caractères" });
+    }
+
+    db.query(
+        "SELECT id_utilisateur, token_reset_expiration FROM Utilisateur WHERE token_reset = ?",
+        [token],
+        async (err, results) => {
+            if (err) {
+                return res.status(500).json({ success: false, message: "Erreur serveur" });
+            }
+
+            if (results.length === 0) {
+                return res.status(400).json({ success: false, message: "Lien invalide ou déjà utilisé" });
+            }
+
+            const user = results[0];
+
+            if (!user.token_reset_expiration || new Date() > new Date(user.token_reset_expiration)) {
+                return res.status(400).json({ success: false, message: "Lien expiré. Refaites une demande." });
+            }
+
+            const hashedPassword = await hashPassword(password);
+
+            db.query(
+                "UPDATE Utilisateur SET mot_de_passe = ?, token_reset = NULL, token_reset_expiration = NULL WHERE id_utilisateur = ?",
+                [hashedPassword, user.id_utilisateur],
+                (err2) => {
+                    if (err2) {
+                        return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    }
+                    res.json({ success: true, message: "Mot de passe réinitialisé avec succès" });
+                }
+            );
+        }
+    );
+});
+
+/*
+----------------------------------
 ROUTES API
 ----------------------------------
 */
@@ -250,13 +377,78 @@ app.use("/api/etudiant", etudiantRoutes(db));
 
 /*
 ----------------------------------
+TEMPS RÉEL (Socket.IO) — chat de groupe + notifications
+----------------------------------
+Un seul fil de discussion par groupe. Y ont accès :
+  - les étudiants membres du groupe (table Membre_de)
+  - l'encadrant propriétaire du projet auquel le groupe appartient
+Chaque socket rejoint :
+  - "user:<id>"   pour recevoir ses notifications en direct
+  - "group:<id>"  pour recevoir les messages du/des groupe(s) qu'il consulte
+*/
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: true, credentials: true }
+});
+
+// On expose io aux routes via req.app.get("io")
+app.set("io", io);
+
+// Partage de la session HTTP avec les connexions Socket.IO
+io.use((socket, next) => {
+    sessionMiddleware(socket.request, {}, next);
+});
+
+// Vérifie qu'un utilisateur a le droit d'accéder au chat d'un groupe
+function canAccessGroup(userId, groupId, cb) {
+    db.query(
+        `SELECT 1 FROM Groupe g
+         JOIN Projet p ON p.id_projet = g.id_projet
+         WHERE g.id_groupe = ?
+           AND ( p.id_utilisateur = ?
+                 OR EXISTS (SELECT 1 FROM Membre_de md
+                            WHERE md.id_groupe = g.id_groupe AND md.id_utilisateur = ?) )
+         LIMIT 1`,
+        [groupId, userId, userId],
+        (err, rows) => cb(err, !!(rows && rows.length))
+    );
+}
+
+io.on("connection", (socket) => {
+    const sess = socket.request.session;
+    const userId = sess && sess.userId;
+
+    // Connexion non authentifiée : on coupe.
+    if (!userId) {
+        socket.disconnect(true);
+        return;
+    }
+
+    // Salon personnel pour les notifications en direct
+    socket.join("user:" + userId);
+
+    socket.on("join-group", (groupId) => {
+        if (!groupId) return;
+        canAccessGroup(userId, groupId, (err, ok) => {
+            if (!err && ok) socket.join("group:" + groupId);
+        });
+    });
+
+    socket.on("leave-group", (groupId) => {
+        if (groupId) socket.leave("group:" + groupId);
+    });
+});
+
+/*
+----------------------------------
 Lancement serveur (écoute sur tout le réseau pour l'accès WiFi local)
 ----------------------------------
 */
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "0.0.0.0", () => {
     console.log("============================================================");
     console.log(`  ProjectFLOW démarré sur le port ${PORT}`);
     console.log("------------------------------------------------------------");

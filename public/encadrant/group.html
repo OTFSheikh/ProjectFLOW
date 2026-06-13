@@ -64,6 +64,7 @@
 
     <div class="toast" id="toast"></div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="sidebar.js"></script>
     <script>
         renderSidebar("projects");
@@ -296,23 +297,95 @@
             `;
         }
 
+        let chatMyId = null;
+        let chatSocket = null;
+        let chatMsgIds = new Set();
+        let chatDelWired = false;
+
+        // Délégation du clic "supprimer" sur le conteneur statique #tab-messages.
+        function wireChatDelete() {
+            if (chatDelWired) return;
+            chatDelWired = true;
+            document.getElementById("tab-messages").addEventListener("click", (e) => {
+                const btn = e.target.closest(".chat-del");
+                if (btn) deleteMessage(Number(btn.dataset.mid));
+            });
+        }
+
+        function chatBubbleHtml(m) {
+            const mine = m.id_utilisateur === chatMyId;
+            const time = new Date(m.date_envoi).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+            return `
+                <div class="chat-bubble ${mine ? 'sent' : 'received'}" data-mid="${m.id_message}">
+                    <div class="sender">${esc(m.prenom)} ${esc(m.nom)}
+                        <button class="chat-del" data-mid="${m.id_message}" title="Supprimer ce message" style="border:none;background:none;color:inherit;opacity:0.6;cursor:pointer;font-size:0.7rem;padding:0;margin-left:0.4rem;"><i class="fas fa-trash"></i></button>
+                    </div>
+                    ${esc(m.contenu)}
+                    <div class="time">${time}</div>
+                </div>`;
+        }
+
+        function setupChatSocket() {
+            if (chatSocket || typeof io === "undefined") return;
+            chatSocket = io({ withCredentials: true });
+            chatSocket.on("connect", () => chatSocket.emit("join-group", groupId));
+            chatSocket.on("new-message", (m) => {
+                if (String(m.id_groupe) !== String(groupId)) return;
+                appendChatMessage(m);
+            });
+            chatSocket.on("message-deleted", (d) => {
+                if (String(d.id_groupe) !== String(groupId)) return;
+                removeChatMessage(d.id_message);
+            });
+        }
+
+        function removeChatMessage(id) {
+            const el = document.querySelector(`#chatMessages .chat-bubble[data-mid="${id}"]`);
+            if (el) el.remove();
+            chatMsgIds.delete(Number(id));
+        }
+
+        async function deleteMessage(id) {
+            if (!confirm("Supprimer ce message ?")) return;
+            const res = await fetch(`/api/encadrant/groups/${groupId}/messages/${id}`, {
+                method: "DELETE", credentials: "include"
+            });
+            const data = await res.json();
+            if (data.success) {
+                // La suppression revient via le socket. Secours si déconnecté :
+                if (!chatSocket || !chatSocket.connected) removeChatMessage(id);
+            } else {
+                showToast(data.message || "Suppression impossible", "error");
+            }
+        }
+
+        function appendChatMessage(m) {
+            if (chatMsgIds.has(m.id_message)) return;
+            const chatEl = document.getElementById("chatMessages");
+            if (!chatEl) return; // onglet Messages pas affiché : on rechargera à l'ouverture
+            chatMsgIds.add(m.id_message);
+            const placeholder = chatEl.querySelector(".chat-empty");
+            if (placeholder) placeholder.remove();
+            chatEl.insertAdjacentHTML("beforeend", chatBubbleHtml(m));
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
         async function renderMessages() {
             const res = await fetch(`/api/encadrant/groups/${groupId}/messages`, { credentials: "include" });
             const data = await res.json();
 
-            const myId = (await (await fetch("/api/auth/me", { credentials: "include" })).json()).utilisateur.id_utilisateur;
+            if (chatMyId === null) {
+                chatMyId = (await (await fetch("/api/auth/me", { credentials: "include" })).json()).utilisateur.id_utilisateur;
+            }
+
+            const msgs = (data.success && data.messages) ? data.messages : [];
+            chatMsgIds = new Set(msgs.map(m => m.id_message));
 
             document.getElementById("tab-messages").innerHTML = `
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages">
-                        ${(!data.success || data.messages.length === 0) ? '<p style="text-align:center;color:var(--gray-400);padding:2rem;">Aucun message pour le moment.</p>' :
-                        data.messages.map(m => `
-                            <div class="chat-bubble ${m.id_utilisateur === myId ? 'sent' : 'received'}">
-                                <div class="sender">${esc(m.prenom)} ${esc(m.nom)}</div>
-                                ${esc(m.contenu)}
-                                <div class="time">${new Date(m.date_envoi).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</div>
-                            </div>
-                        `).join("")}
+                        ${msgs.length === 0 ? '<p class="chat-empty" style="text-align:center;color:var(--gray-400);padding:2rem;">Aucun message pour le moment.</p>' :
+                        msgs.map(chatBubbleHtml).join("")}
                     </div>
                     <div class="chat-input">
                         <input type="text" id="msgInput" placeholder="Écrire un message..." />
@@ -326,6 +399,9 @@
 
             document.getElementById("sendMsgBtn").addEventListener("click", sendMessage);
             document.getElementById("msgInput").addEventListener("keypress", (e) => { if (e.key === "Enter") sendMessage(); });
+
+            wireChatDelete();
+            setupChatSocket();
         }
 
         async function sendMessage() {
@@ -337,7 +413,8 @@
                 method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
                 body: JSON.stringify({ contenu })
             });
-            renderMessages();
+            // Le message revient en direct via le socket. Secours si déconnecté :
+            if (!chatSocket || !chatSocket.connected) renderMessages();
         }
 
         async function renderLivrables() {

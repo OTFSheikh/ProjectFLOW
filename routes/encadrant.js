@@ -388,32 +388,132 @@ module.exports = function (db) {
     });
 
     // --- MESSAGES ---
-    router.get("/groups/:id/messages", (req, res) => {
+    // Vérifie que le groupe appartient bien à un projet de cet encadrant.
+    function ownsGroup(userId, groupId, cb) {
         db.query(
-            `SELECT m.*, u.nom, u.prenom, u.est_encadrant
-             FROM Message m JOIN Utilisateur u ON m.id_utilisateur = u.id_utilisateur
-             WHERE m.id_groupe = ?
-             ORDER BY m.date_envoi ASC`,
-            [req.params.id],
-            (err, results) => {
-                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
-                res.json({ success: true, messages: results });
-            }
+            `SELECT g.id_groupe, g.id_projet, g.nom AS groupe_nom
+             FROM Groupe g JOIN Projet p ON g.id_projet = p.id_projet
+             WHERE g.id_groupe = ? AND p.id_utilisateur = ?`,
+            [groupId, userId],
+            (err, rows) => cb(err, rows && rows.length ? rows[0] : null)
         );
+    }
+
+    router.get("/groups/:id/messages", (req, res) => {
+        ownsGroup(req.session.userId, req.params.id, (err, grp) => {
+            if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            if (!grp) return res.status(403).json({ success: false, message: "Accès refusé" });
+
+            db.query(
+                `SELECT m.*, u.nom, u.prenom, u.est_encadrant
+                 FROM Message m JOIN Utilisateur u ON m.id_utilisateur = u.id_utilisateur
+                 WHERE m.id_groupe = ?
+                 ORDER BY m.date_envoi ASC`,
+                [req.params.id],
+                (err2, results) => {
+                    if (err2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    res.json({ success: true, messages: results });
+                }
+            );
+        });
     });
 
     router.post("/groups/:id/messages", (req, res) => {
+        const userId = req.session.userId;
+        const groupId = req.params.id;
         const { contenu } = req.body;
-        if (!contenu) return res.status(400).json({ success: false, message: "Message vide" });
+        if (!contenu || !contenu.trim()) {
+            return res.status(400).json({ success: false, message: "Message vide" });
+        }
 
-        db.query(
-            "INSERT INTO Message (contenu, id_utilisateur, id_groupe) VALUES (?, ?, ?)",
-            [contenu, req.session.userId, req.params.id],
-            (err) => {
-                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
-                res.status(201).json({ success: true, message: "Message envoyé" });
-            }
-        );
+        ownsGroup(userId, groupId, (err, grp) => {
+            if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            if (!grp) return res.status(403).json({ success: false, message: "Accès refusé" });
+
+            db.query(
+                "INSERT INTO Message (contenu, id_utilisateur, id_groupe) VALUES (?, ?, ?)",
+                [contenu, userId, groupId],
+                (err2, result) => {
+                    if (err2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    const messageId = result.insertId;
+                    const io = req.app.get("io");
+
+                    // Récupère le message complet pour la diffusion temps réel.
+                    db.query(
+                        `SELECT m.*, u.nom, u.prenom, u.est_encadrant
+                         FROM Message m JOIN Utilisateur u ON m.id_utilisateur = u.id_utilisateur
+                         WHERE m.id_message = ?`,
+                        [messageId],
+                        (err3, msgRows) => {
+                            if (!err3 && msgRows.length && io) {
+                                io.to("group:" + groupId).emit("new-message", msgRows[0]);
+                            }
+                        }
+                    );
+
+                    // Message de l'encadrant => notifier TOUS les membres du groupe.
+                    db.query(
+                        "SELECT id_utilisateur FROM Membre_de WHERE id_groupe = ?",
+                        [groupId],
+                        (err4, membres) => {
+                            if (!err4 && membres.length) {
+                                const texte = `Nouveau message de l'encadrant dans le groupe « ${grp.groupe_nom} »`;
+                                const values = membres.map(mb => [texte, "message", mb.id_utilisateur, grp.id_projet]);
+                                db.query(
+                                    "INSERT INTO Notification (contenu, type, id_utilisateur, id_projet) VALUES ?",
+                                    [values],
+                                    () => {}
+                                );
+                                if (io) {
+                                    membres.forEach(mb => {
+                                        io.to("user:" + mb.id_utilisateur).emit("new-notification", {
+                                            contenu: texte,
+                                            type: "message",
+                                            id_projet: grp.id_projet,
+                                            id_groupe: Number(groupId)
+                                        });
+                                    });
+                                }
+                            }
+
+                            res.status(201).json({ success: true, message: "Message envoyé", id_message: messageId });
+                        }
+                    );
+                }
+            );
+        });
+    });
+
+    // Supprimer un message (l'encadrant propriétaire peut supprimer n'importe
+    // quel message du groupe — modération).
+    router.delete("/groups/:id/messages/:msgId", (req, res) => {
+        const userId = req.session.userId;
+        const groupId = req.params.id;
+        const msgId = req.params.msgId;
+
+        ownsGroup(userId, groupId, (err, grp) => {
+            if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            if (!grp) return res.status(403).json({ success: false, message: "Accès refusé" });
+
+            db.query(
+                "DELETE FROM Message WHERE id_message = ? AND id_groupe = ?",
+                [msgId, groupId],
+                (err2, result) => {
+                    if (err2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    if (result.affectedRows === 0) {
+                        return res.status(404).json({ success: false, message: "Message introuvable" });
+                    }
+                    const io = req.app.get("io");
+                    if (io) {
+                        io.to("group:" + groupId).emit("message-deleted", {
+                            id_message: Number(msgId),
+                            id_groupe: Number(groupId)
+                        });
+                    }
+                    res.json({ success: true });
+                }
+            );
+        });
     });
 
     // --- LIVRABLES ---

@@ -6,6 +6,32 @@
     <title>ProjectFLOW - Notifications</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link rel="stylesheet" href="common.css" />
+    <style>
+        .notif-list { display: flex; flex-direction: column; gap: 0.6rem; max-width: 760px; }
+        .notif-card {
+            display: flex; align-items: flex-start; gap: 0.8rem;
+            background: var(--white); border: 1px solid var(--gray-200);
+            border-radius: 10px; padding: 0.9rem 1rem; transition: background 0.15s;
+        }
+        .notif-card.unread { background: var(--primary-light, #eef2ff); border-color: var(--primary, #6366f1); }
+        .notif-icon {
+            width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--primary, #6366f1); color: #fff; font-size: 0.85rem;
+        }
+        .notif-icon.message { background: #6366f1; }
+        .notif-icon.systeme { background: #64748b; }
+        .notif-body { flex: 1; min-width: 0; }
+        .notif-text { font-size: 0.85rem; color: var(--gray-900); }
+        .notif-meta { font-size: 0.7rem; color: var(--gray-500); margin-top: 0.25rem; }
+        .notif-actions { display: flex; align-items: center; gap: 0.5rem; }
+        .notif-read-btn {
+            border: none; background: transparent; color: var(--primary, #6366f1);
+            cursor: pointer; font-size: 0.72rem; white-space: nowrap;
+        }
+        .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary, #6366f1); flex-shrink: 0; margin-top: 6px; }
+        .notif-empty { color: var(--gray-500); font-size: 0.9rem; padding: 2rem 0; }
+    </style>
 </head>
 <body>
     <nav id="sidebar"></nav>
@@ -14,18 +40,106 @@
         <header class="topbar">
             <div>
                 <div class="breadcrumb">Notifications</div>
-                <h1>Notifications</h1>
+                <h1>Notifications <span id="notifCount" style="font-size:0.9rem;color:var(--gray-500);font-weight:500;"></span></h1>
             </div>
         </header>
 
         <main class="page-content">
+            <div class="notif-list" id="notifList">
+                <div class="notif-empty">Chargement…</div>
+            </div>
         </main>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="sidebar.js"></script>
     <script>
     renderSidebar("notifications");
     checkEtudiantAuth();
+
+    let notifications = [];
+
+    function esc(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+            { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+        ));
+    }
+
+    function fmtDate(d) {
+        if (!d) return "";
+        return new Date(d).toLocaleString("fr-FR", {
+            day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+        });
+    }
+
+    function render() {
+        const list = document.getElementById("notifList");
+        const unread = notifications.filter(n => !n.lu).length;
+        document.getElementById("notifCount").textContent = unread ? `(${unread} non lue${unread > 1 ? "s" : ""})` : "";
+
+        if (notifications.length === 0) {
+            list.innerHTML = `<div class="notif-empty">Aucune notification pour le moment.</div>`;
+            return;
+        }
+
+        list.innerHTML = notifications.map(n => {
+            const type = (n.type || "systeme").toLowerCase();
+            const icon = type === "message" ? "fa-comment-dots" : "fa-bell";
+            return `
+                <div class="notif-card ${n.lu ? "" : "unread"}">
+                    <div class="notif-icon ${type}"><i class="fas ${icon}"></i></div>
+                    <div class="notif-body">
+                        <div class="notif-text">${esc(n.contenu)}</div>
+                        <div class="notif-meta">${fmtDate(n.date_creation)}</div>
+                    </div>
+                    <div class="notif-actions">
+                        ${n.lu ? "" : `<button class="notif-read-btn" data-id="${n.id_notification}">Marquer lu</button>`}
+                    </div>
+                </div>`;
+        }).join("");
+
+        list.querySelectorAll(".notif-read-btn").forEach(btn => {
+            btn.addEventListener("click", () => markRead(Number(btn.dataset.id)));
+        });
+    }
+
+    async function load() {
+        try {
+            const res = await fetch("/api/etudiant/notifications", { credentials: "include" });
+            const data = await res.json();
+            if (data.success) {
+                notifications = data.notifications || [];
+                render();
+            }
+        } catch (e) {
+            document.getElementById("notifList").innerHTML =
+                `<div class="notif-empty">Erreur de chargement des notifications.</div>`;
+        }
+    }
+
+    async function markRead(id) {
+        try {
+            await fetch(`/api/etudiant/notifications/${id}/read`, {
+                method: "PATCH", credentials: "include"
+            });
+            const n = notifications.find(x => x.id_notification === id);
+            if (n) n.lu = 1;
+            render();
+        } catch (e) { /* non bloquant */ }
+    }
+
+    // Temps réel : nouvelle notification (ex. message de l'encadrant)
+    function setupSocket() {
+        if (typeof io === "undefined") return;
+        const socket = io({ withCredentials: true });
+        socket.on("new-notification", (n) => {
+            // On recharge depuis le serveur pour récupérer l'id et la date réels.
+            load();
+        });
+    }
+
+    load();
+    setupSocket();
     </script>
 </body>
 </html>

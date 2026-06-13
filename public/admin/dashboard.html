@@ -611,6 +611,11 @@
                     closeModal();
                     loadUsers();
                 } else {
+                    if (res.status === 401) {
+                        showToast("Session expirée. Veuillez vous reconnecter.", "error");
+                        setTimeout(() => { window.location.href = "/login.html"; }, 1500);
+                        return;
+                    }
                     showToast(data.message, "error");
                 }
             } catch {

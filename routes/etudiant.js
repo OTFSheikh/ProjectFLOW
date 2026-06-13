@@ -1109,6 +1109,10 @@ module.exports = function (db) {
         const groupId = req.params.groupId;
         const { contenu } = req.body;
 
+        if (!contenu || !contenu.trim()) {
+            return res.status(400).json({ success: false, message: "Message vide" });
+        }
+
         isMember(userId, groupId, (err, info) => {
             if (err) return res.status(500).json({ success: false, error: err.message });
             if (!info.isMember) return res.status(403).json({ success: false, message: "Accès refusé" });
@@ -1118,9 +1122,56 @@ module.exports = function (db) {
                 [contenu, userId, groupId],
                 (err, result) => {
                     if (err) return res.status(500).json({ success: false, error: err.message });
-                    // NB : on ne crée PAS de notification par message de chat (ce serait
-                    // du bruit). Le chat se consulte directement dans l'onglet Chat.
-                    res.json({ success: true, id_message: result.insertId });
+                    const messageId = result.insertId;
+
+                    // Diffusion temps réel à tous les sockets du groupe (membres + encadrant).
+                    // NB : on ne crée PAS de notification pour un message entre étudiants
+                    // (ce serait du bruit). Les notifications ne sont émises que pour les
+                    // messages de l'encadrant (voir routes/encadrant.js).
+                    db.query(
+                        `SELECT m.*, u.nom, u.prenom, u.est_encadrant
+                         FROM Message m JOIN Utilisateur u ON m.id_utilisateur = u.id_utilisateur
+                         WHERE m.id_message = ?`,
+                        [messageId],
+                        (err2, msgRows) => {
+                            const io = req.app.get("io");
+                            if (!err2 && msgRows.length && io) {
+                                io.to("group:" + groupId).emit("new-message", msgRows[0]);
+                            }
+                            res.json({ success: true, id_message: messageId });
+                        }
+                    );
+                }
+            );
+        });
+    });
+
+    // Supprimer un message (l'étudiant ne peut supprimer que SES propres messages)
+    router.delete("/groups/:groupId/messages/:msgId", (req, res) => {
+        const userId = req.session.userId;
+        const groupId = req.params.groupId;
+        const msgId = req.params.msgId;
+
+        isMember(userId, groupId, (err, info) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (!info.isMember) return res.status(403).json({ success: false, message: "Accès refusé" });
+
+            db.query(
+                "DELETE FROM Message WHERE id_message = ? AND id_groupe = ? AND id_utilisateur = ?",
+                [msgId, groupId, userId],
+                (err2, result) => {
+                    if (err2) return res.status(500).json({ success: false, error: err2.message });
+                    if (result.affectedRows === 0) {
+                        return res.status(403).json({ success: false, message: "Vous ne pouvez supprimer que vos propres messages" });
+                    }
+                    const io = req.app.get("io");
+                    if (io) {
+                        io.to("group:" + groupId).emit("message-deleted", {
+                            id_message: Number(msgId),
+                            id_groupe: Number(groupId)
+                        });
+                    }
+                    res.json({ success: true });
                 }
             );
         });
