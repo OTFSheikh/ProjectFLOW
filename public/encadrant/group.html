@@ -26,6 +26,7 @@
                 <button class="tab active" data-tab="apercu">Aperçu</button>
                 <button class="tab" data-tab="membres">Membres</button>
                 <button class="tab" data-tab="taches">Tâches</button>
+                <button class="tab" data-tab="calendrier">Calendrier</button>
                 <button class="tab" data-tab="messages">Messages</button>
                 <button class="tab" data-tab="notes">Notes</button>
                 <button class="tab" data-tab="livrables">Livrables</button>
@@ -35,6 +36,7 @@
             <div class="tab-content active" id="tab-apercu"></div>
             <div class="tab-content" id="tab-membres"></div>
             <div class="tab-content" id="tab-taches"></div>
+            <div class="tab-content" id="tab-calendrier"></div>
             <div class="tab-content" id="tab-messages"></div>
             <div class="tab-content" id="tab-notes"></div>
             <div class="tab-content" id="tab-livrables"></div>
@@ -62,9 +64,25 @@
         </div>
     </div>
 
+    <!-- Modal commentaires livrable -->
+    <div class="modal-overlay" id="delivCommentsModal">
+        <div class="modal">
+            <h2>Commentaires du livrable</h2>
+            <p style="font-size:0.78rem;color:var(--gray-500);margin:0.25rem 0 0.6rem;">Vos commentaires sont visibles par les étudiants. Les échanges entre étudiants ne vous sont pas montrés.</p>
+            <div id="delivCommentsList" style="display:flex;flex-direction:column;gap:0.5rem;max-height:300px;overflow:auto;margin-bottom:0.75rem;"></div>
+            <textarea id="delivCommentInput" placeholder="Écrire un commentaire…" style="width:100%;min-height:70px;border:1px solid var(--gray-200);border-radius:8px;padding:0.5rem;font-family:inherit;box-sizing:border-box;"></textarea>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="delivCommentsClose">Fermer</button>
+                <button type="button" class="btn btn-primary" id="delivCommentSend">Envoyer</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/ui.js"></script>
+    <script src="/calendar.js"></script>
     <script src="sidebar.js"></script>
     <script>
         renderSidebar("projects");
@@ -169,6 +187,7 @@
                 case "apercu": renderApercu(); break;
                 case "membres": renderMembres(); break;
                 case "taches": renderTaches(); break;
+                case "calendrier": renderCalendrier(); break;
                 case "messages": renderMessages(); break;
                 case "notes": renderNotes(); break;
                 case "livrables": renderLivrables(); break;
@@ -297,6 +316,36 @@
             `;
         }
 
+        async function renderCalendrier() {
+            const container = document.getElementById("tab-calendrier");
+            container.innerHTML = `<div id="groupCalendar"></div>`;
+            const res = await fetch(`/api/encadrant/groups/${groupId}/tasks`, { credentials: "include" });
+            const data = await res.json();
+            const tasks = (data.success && data.tasks) ? data.tasks : [];
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const events = [];
+            const jalonSeen = new Set();
+            tasks.forEach(t => {
+                if (t.id_jalon && t.jalon_date && !jalonSeen.has(t.id_jalon)) {
+                    jalonSeen.add(t.id_jalon);
+                    events.push({ date: t.jalon_date, label: "Jalon : " + t.jalon_titre, type: "jalon" });
+                }
+                if (t.date_limite) {
+                    const late = new Date(t.date_limite) < today && t.statut !== "Terminee";
+                    events.push({ date: t.date_limite, label: t.titre, type: "tache", late });
+                }
+            });
+            try {
+                const pRes = await fetch(`/api/encadrant/projects/${groupData.id_projet}`, { credentials: "include" });
+                const pData = await pRes.json();
+                if (pData.success && pData.project) {
+                    if (pData.project.date_debut) events.push({ date: pData.project.date_debut, label: "Début projet", type: "projet" });
+                    if (pData.project.date_fin) events.push({ date: pData.project.date_fin, label: "Soutenance", type: "projet" });
+                }
+            } catch (e) { /* non bloquant */ }
+            createCalendar("groupCalendar", events);
+        }
+
         let chatMyId = null;
         let chatSocket = null;
         let chatMsgIds = new Set();
@@ -346,7 +395,7 @@
         }
 
         async function deleteMessage(id) {
-            if (!confirm("Supprimer ce message ?")) return;
+            if (!await uiConfirm("Supprimer ce message ?", { title: "Supprimer le message", danger: true, okText: "Supprimer" })) return;
             const res = await fetch(`/api/encadrant/groups/${groupId}/messages/${id}`, {
                 method: "DELETE", credentials: "include"
             });
@@ -429,15 +478,16 @@
                             <tbody>
                                 ${data.deliverables.map(l => `
                                     <tr>
-                                        <td>${esc(l.nom)}</td>
+                                        <td>${l.chemin_fichier ? `<a href="/uploads/${esc(l.chemin_fichier)}" target="_blank">${esc(l.nom)} <i class="fas fa-download" style="font-size:0.7rem;"></i></a>` : esc(l.nom)}</td>
                                         <td>${esc(l.deposant_prenom)} ${esc(l.deposant_nom)}</td>
                                         <td>${new Date(l.date_depot).toLocaleDateString('fr-FR')}</td>
-                                        <td><span class="badge ${l.statut_validation === 'Valide' ? 'badge-success' : l.statut_validation === 'Rejete' ? 'badge-danger' : 'badge-warning'}">${l.statut_validation}</span></td>
+                                        <td><span class="badge ${l.statut_validation === 'Valide' ? 'badge-success' : l.statut_validation === 'Refuse' ? 'badge-danger' : 'badge-warning'}">${l.statut_validation}</span></td>
                                         <td>
+                                            <button class="btn btn-secondary btn-sm" title="Commentaires" onclick="openDelivComments(${l.id_livrable})"><i class="fas fa-comment"></i></button>
                                             ${l.statut_validation === 'En_attente' ? `
                                                 <button class="btn btn-primary btn-sm" onclick="validateLivrable(${l.id_livrable}, 'Valide')"><i class="fas fa-check"></i></button>
-                                                <button class="btn btn-secondary btn-sm" onclick="validateLivrable(${l.id_livrable}, 'Rejete')"><i class="fas fa-times"></i></button>
-                                            ` : '—'}
+                                                <button class="btn btn-secondary btn-sm" onclick="validateLivrable(${l.id_livrable}, 'Refuse')"><i class="fas fa-times"></i></button>
+                                            ` : ''}
                                         </td>
                                     </tr>
                                 `).join("")}
@@ -449,11 +499,22 @@
         }
 
         async function validateLivrable(id, statut) {
+            const refuse = statut === "Refuse";
+            const commentaire = await uiPrompt(
+                refuse ? "Commentaire pour l'étudiant (motif du refus) :" : "Commentaire (optionnel) :",
+                {
+                    title: refuse ? "Refuser le livrable" : "Valider le livrable",
+                    okText: refuse ? "Refuser" : "Valider",
+                    multiline: true,
+                    placeholder: "Votre commentaire…"
+                }
+            );
+            if (commentaire === null) return; // annulé
             await fetch(`/api/encadrant/deliverables/${id}/validate`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include",
-                body: JSON.stringify({ statut })
+                body: JSON.stringify({ statut, commentaire })
             });
-            showToast(statut === "Valide" ? "Livrable validé" : "Livrable rejeté");
+            showToast(statut === "Valide" ? "Livrable validé" : "Livrable refusé");
             renderLivrables();
         }
 
@@ -609,10 +670,10 @@
             });
         }
 
-        function editGroupNote(id, titre, contenu) {
-            const newTitre = prompt("Titre :", titre);
+        async function editGroupNote(id, titre, contenu) {
+            const newTitre = await uiPrompt("Titre :", { title: "Modifier la note", defaultValue: titre, okText: "Suivant" });
             if (newTitre === null) return;
-            const newContenu = prompt("Contenu :", contenu);
+            const newContenu = await uiPrompt("Contenu :", { title: "Modifier la note", defaultValue: contenu, multiline: true, okText: "Enregistrer" });
             if (newContenu === null || !newContenu.trim()) return;
 
             fetch(`/api/encadrant/notes/${id}`, {
@@ -632,6 +693,44 @@
             t.textContent = msg; t.className = `toast show ${type}`;
             setTimeout(() => t.className = "toast", 3000);
         }
+
+        let currentDelivCommentId = null;
+        async function openDelivComments(id) {
+            currentDelivCommentId = id;
+            document.getElementById("delivCommentInput").value = "";
+            document.getElementById("delivCommentsModal").classList.add("active");
+            await loadEncDelivComments(id);
+        }
+        async function loadEncDelivComments(id) {
+            const res = await fetch(`/api/encadrant/deliverables/${id}/comments`, { credentials: "include" });
+            const data = await res.json();
+            const list = document.getElementById("delivCommentsList");
+            const comments = (data.success && data.comments) ? data.comments : [];
+            list.innerHTML = comments.length
+                ? comments.map(c => `
+                    <div style="font-size:0.82rem;border-bottom:1px solid var(--gray-100);padding-bottom:0.4rem;">
+                        <span style="font-weight:600;color:var(--primary);">${esc(c.prenom)} ${esc(c.nom)} · Encadrant</span>
+                        <span style="color:var(--gray-400);font-size:0.7rem;margin-left:0.4rem;">${new Date(c.date_creation).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        <div style="color:var(--gray-700);">${esc(c.contenu)}</div>
+                    </div>`).join("")
+                : '<p style="color:var(--gray-400);font-size:0.8rem;">Aucun commentaire de votre part pour le moment.</p>';
+        }
+        document.getElementById("delivCommentsClose").addEventListener("click", () => document.getElementById("delivCommentsModal").classList.remove("active"));
+        document.getElementById("delivCommentsModal").addEventListener("click", (e) => { if (e.target.id === "delivCommentsModal") e.currentTarget.classList.remove("active"); });
+        document.getElementById("delivCommentSend").addEventListener("click", async () => {
+            const contenu = document.getElementById("delivCommentInput").value.trim();
+            if (!contenu) { showToast("Commentaire vide", "error"); return; }
+            const res = await fetch(`/api/encadrant/deliverables/${currentDelivCommentId}/comments`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+                body: JSON.stringify({ contenu })
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById("delivCommentInput").value = "";
+                showToast("Commentaire ajouté");
+                loadEncDelivComments(currentDelivCommentId);
+            } else { showToast(data.message || "Erreur", "error"); }
+        });
 
         load();
     </script>

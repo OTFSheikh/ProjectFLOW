@@ -138,6 +138,18 @@ module.exports = function (db) {
         );
     }
 
+    // Notifie l'encadrant propriétaire d'un projet (insertion + push temps réel).
+    function notifyEncadrant(req, idProjet, contenu, type) {
+        if (!idProjet) return;
+        db.query("SELECT id_utilisateur FROM Projet WHERE id_projet = ?", [idProjet], (e, r) => {
+            if (e || !r.length) return;
+            const encId = r[0].id_utilisateur;
+            notify([encId], contenu, type, idProjet, () => {});
+            const io = req.app.get("io");
+            if (io) io.to("user:" + encId).emit("new-notification", { contenu, type, id_projet: idProjet });
+        });
+    }
+
     // Construit la requête d'activité (livrables + messages) avec une condition
     // de portée injectée (tous mes groupes, ou un groupe précis).
     function activitySql(cond) {
@@ -839,7 +851,7 @@ module.exports = function (db) {
        LIVRABLES
     ============================================================ */
 
-    // Liste des livrables d'un groupe
+    // Liste des livrables d'un groupe (documents finaux, rattachés au groupe)
     router.get("/groups/:groupId/deliverables", (req, res) => {
         const userId = req.session.userId;
         const groupId = req.params.groupId;
@@ -848,72 +860,46 @@ module.exports = function (db) {
             if (err) return res.status(500).json({ success: false, error: err.message });
             if (!info.isMember) return res.status(403).json({ success: false, message: "Accès refusé" });
 
-            // Livrables liés à des tâches du groupe + livrables directement liés au groupe (finaux)
             const sql = `
                 SELECT
                     l.*,
-                    u.nom AS deposant_nom, u.prenom AS deposant_prenom,
-                    t.titre AS tache_titre
+                    u.nom AS deposant_nom, u.prenom AS deposant_prenom
                 FROM Livrable l
                 JOIN Utilisateur u ON u.id_utilisateur = l.id_etudiant_deposant
-                LEFT JOIN Tache t ON t.id_tache = l.id_tache
-                LEFT JOIN Jalon j ON j.id_jalon = t.id_jalon
-                WHERE l.id_groupe = ? OR j.id_groupe = ?
+                WHERE l.id_groupe = ?
                 ORDER BY l.date_depot DESC
             `;
-            db.query(sql, [groupId, groupId], (err, results) => {
+            db.query(sql, [groupId], (err, results) => {
                 if (err) return res.status(500).json({ success: false, error: err.message });
                 res.json({ success: true, deliverables: results });
             });
         });
     });
 
-    // Déposer un livrable (sur une tâche OU sur le groupe global)
+    // Déposer un livrable (document final, rattaché au groupe)
     router.post("/deliverables", upload.single("fichier"), (req, res) => {
         const userId = req.session.userId;
-        const { id_tache, id_groupe, nom } = req.body;
+        const { id_groupe, nom } = req.body;
 
         if (!req.file) return res.status(400).json({ success: false, message: "Fichier manquant" });
+        if (!id_groupe) return res.status(400).json({ success: false, message: "Groupe manquant" });
 
-        // XOR : id_tache OU id_groupe (jamais les deux)
-        if ((id_tache && id_groupe) || (!id_tache && !id_groupe)) {
-            return res.status(400).json({ success: false, message: "Fournir soit id_tache, soit id_groupe (pas les deux)" });
-        }
-
-        // FIX : l'étudiant qui dépose doit être membre du groupe concerné (règle métier doc).
-        // On résout d'abord le groupe (directement, ou via la tâche), puis on vérifie l'appartenance.
-        const resolveGroup = (cb) => {
-            if (id_groupe) return cb(null, id_groupe);
-            db.query(
-                "SELECT j.id_groupe FROM Tache t JOIN Jalon j ON j.id_jalon = t.id_jalon WHERE t.id_tache = ?",
-                [id_tache],
-                (err, rows) => {
-                    if (err) return cb(err);
-                    cb(null, rows.length ? rows[0].id_groupe : null);
-                }
-            );
-        };
-
-        resolveGroup((err, groupId) => {
+        isMember(userId, id_groupe, (err, info) => {
             if (err) return res.status(500).json({ success: false, error: err.message });
-            if (!groupId) return res.status(404).json({ success: false, message: "Cible introuvable" });
+            if (!info.isMember) return res.status(403).json({ success: false, message: "Vous n'êtes pas membre de ce groupe" });
 
-            isMember(userId, groupId, (err2, info) => {
+            const sql = `
+                INSERT INTO Livrable (nom, chemin_fichier, id_groupe, id_etudiant_deposant)
+                VALUES (?, ?, ?, ?)
+            `;
+            db.query(sql, [nom || req.file.originalname, req.file.filename, id_groupe, userId], (err2, result) => {
                 if (err2) return res.status(500).json({ success: false, error: err2.message });
-                if (!info.isMember) return res.status(403).json({ success: false, message: "Vous n'êtes pas membre de ce groupe" });
-
-                const sql = `
-                    INSERT INTO Livrable (nom, chemin_fichier, id_tache, id_groupe, id_etudiant_deposant)
-                    VALUES (?, ?, ?, ?, ?)
-                `;
-                db.query(sql, [nom || req.file.originalname, req.file.filename, id_tache || null, id_groupe || null, userId], (err3, result) => {
-                    if (err3) return res.status(500).json({ success: false, error: err3.message });
-                    // Notifier les autres membres du groupe (type 'livrable')
-                    groupAudience(groupId, userId, (eA, idProjet, others) => {
-                        const label = nom || req.file.originalname;
-                        notify(others, `Nouveau livrable déposé : ${label}`, "livrable", idProjet, () => {
-                            res.json({ success: true, id_livrable: result.insertId });
-                        });
+                // Notifier les autres membres du groupe (type 'livrable')
+                groupAudience(id_groupe, userId, (eA, idProjet, others) => {
+                    const label = nom || req.file.originalname;
+                    notify(others, `Nouveau livrable déposé : ${label}`, "livrable", idProjet, () => {
+                        notifyEncadrant(req, idProjet, `Nouveau livrable déposé : ${label}`, "livrable");
+                        res.json({ success: true, id_livrable: result.insertId });
                     });
                 });
             });
@@ -926,33 +912,27 @@ module.exports = function (db) {
         const userId = req.session.userId;
         const livId = req.params.id;
 
-        // Retrouver le groupe + le déposant du livrable
-        const sql = `
-            SELECT l.id_etudiant_deposant,
-                   COALESCE(l.id_groupe, gp.id_groupe) AS id_groupe
-            FROM Livrable l
-            LEFT JOIN Tache t  ON t.id_tache = l.id_tache
-            LEFT JOIN Jalon j  ON j.id_jalon = t.id_jalon
-            LEFT JOIN Groupe gp ON gp.id_groupe = j.id_groupe
-            WHERE l.id_livrable = ?
-        `;
-        db.query(sql, [livId], (err, rows) => {
-            if (err) return res.status(500).json({ success: false, error: err.message });
-            if (rows.length === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
-            const { id_etudiant_deposant, id_groupe } = rows[0];
+        db.query(
+            "SELECT id_etudiant_deposant, id_groupe FROM Livrable WHERE id_livrable = ?",
+            [livId],
+            (err, rows) => {
+                if (err) return res.status(500).json({ success: false, error: err.message });
+                if (rows.length === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+                const { id_etudiant_deposant, id_groupe } = rows[0];
 
-            isMember(userId, id_groupe, (e2, info) => {
-                if (e2) return res.status(500).json({ success: false, error: e2.message });
-                const isOwner = String(id_etudiant_deposant) === String(userId);
-                if (!isOwner && !info.isLeader) {
-                    return res.status(403).json({ success: false, message: "Seul le déposant ou le Team Leader peut supprimer ce livrable" });
-                }
-                db.query("DELETE FROM Livrable WHERE id_livrable = ?", [livId], (e3) => {
-                    if (e3) return res.status(500).json({ success: false, error: e3.message });
-                    res.json({ success: true });
+                isMember(userId, id_groupe, (e2, info) => {
+                    if (e2) return res.status(500).json({ success: false, error: e2.message });
+                    const isOwner = String(id_etudiant_deposant) === String(userId);
+                    if (!isOwner && !info.isLeader) {
+                        return res.status(403).json({ success: false, message: "Seul le déposant ou le Team Leader peut supprimer ce livrable" });
+                    }
+                    db.query("DELETE FROM Livrable WHERE id_livrable = ?", [livId], (e3) => {
+                        if (e3) return res.status(500).json({ success: false, error: e3.message });
+                        res.json({ success: true });
+                    });
                 });
-            });
-        });
+            }
+        );
     });
 
     /* ============================================================
@@ -978,15 +958,8 @@ module.exports = function (db) {
                     return res.status(409).json({ success: false, message: "Le groupe ne peut être marqué « Livré » que depuis l'état En cours / En retard" });
                 }
 
-                // Au moins un livrable doit exister (tâche ou groupe) avant de livrer
-                const sqlHasDeliv = `
-                    SELECT COUNT(*) AS n
-                    FROM Livrable l
-                    LEFT JOIN Tache t ON t.id_tache = l.id_tache
-                    LEFT JOIN Jalon j ON j.id_jalon = t.id_jalon
-                    WHERE l.id_groupe = ? OR j.id_groupe = ?
-                `;
-                db.query(sqlHasDeliv, [groupId, groupId], (e2, dRows) => {
+                // Au moins un livrable doit exister avant de livrer
+                db.query("SELECT COUNT(*) AS n FROM Livrable WHERE id_groupe = ?", [groupId], (e2, dRows) => {
                     if (e2) return res.status(500).json({ success: false, error: e2.message });
                     if (!dRows[0].n) {
                         return res.status(400).json({ success: false, message: "Déposez au moins un livrable avant de marquer le groupe comme livré" });
@@ -997,6 +970,7 @@ module.exports = function (db) {
                         // Prévenir tout le groupe
                         groupAudience(groupId, null, (eA, idProj, members) => {
                             notify(members, "Le groupe a été marqué « Livré »", "systeme", idProj || idProjet, () => {
+                                notifyEncadrant(req, idProj || idProjet, "Un groupe a marqué son projet comme « Livré »", "systeme");
                                 res.json({ success: true, etat: "Livre" });
                             });
                         });
@@ -1041,6 +1015,39 @@ module.exports = function (db) {
         );
     });
 
+    // Lister les commentaires d'une tâche (membres du groupe de la tâche).
+    router.get("/tasks/:id/comments", (req, res) => {
+        const userId = req.session.userId;
+        const taskId = req.params.id;
+
+        db.query(
+            "SELECT j.id_groupe FROM Tache t JOIN Jalon j ON j.id_jalon = t.id_jalon WHERE t.id_tache = ?",
+            [taskId],
+            (err, rows) => {
+                if (err) return res.status(500).json({ success: false, error: err.message });
+                if (rows.length === 0) return res.status(404).json({ success: false, message: "Tâche introuvable" });
+
+                isMember(userId, rows[0].id_groupe, (err2, info) => {
+                    if (err2) return res.status(500).json({ success: false, error: err2.message });
+                    if (!info.isMember) return res.status(403).json({ success: false, message: "Accès refusé" });
+
+                    db.query(
+                        `SELECT c.id_commentaire, c.contenu, c.date_creation, c.id_utilisateur,
+                                u.nom, u.prenom, u.est_encadrant
+                         FROM Commentaire c JOIN Utilisateur u ON u.id_utilisateur = c.id_utilisateur
+                         WHERE c.id_tache = ?
+                         ORDER BY c.date_creation ASC`,
+                        [taskId],
+                        (err3, comments) => {
+                            if (err3) return res.status(500).json({ success: false, error: err3.message });
+                            res.json({ success: true, comments });
+                        }
+                    );
+                });
+            }
+        );
+    });
+
     // Commenter un livrable (membre du groupe du livrable uniquement)
     router.post("/deliverables/:id/comments", (req, res) => {
         const userId = req.session.userId;
@@ -1074,6 +1081,36 @@ module.exports = function (db) {
                 });
             }
         );
+    });
+
+    // Lister les commentaires d'un livrable.
+    // Les étudiants voient TOUS les commentaires : ceux des membres + ceux de l'encadrant.
+    router.get("/deliverables/:id/comments", (req, res) => {
+        const userId = req.session.userId;
+        const livrableId = req.params.id;
+
+        db.query("SELECT id_groupe FROM Livrable WHERE id_livrable = ?", [livrableId], (err, rows) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (rows.length === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+
+            isMember(userId, rows[0].id_groupe, (err2, info) => {
+                if (err2) return res.status(500).json({ success: false, error: err2.message });
+                if (!info.isMember) return res.status(403).json({ success: false, message: "Accès refusé" });
+
+                db.query(
+                    `SELECT c.id_commentaire, c.contenu, c.date_creation, c.id_utilisateur,
+                            u.nom, u.prenom, u.est_encadrant
+                     FROM Commentaire c JOIN Utilisateur u ON u.id_utilisateur = c.id_utilisateur
+                     WHERE c.id_livrable = ?
+                     ORDER BY c.date_creation ASC`,
+                    [livrableId],
+                    (err3, comments) => {
+                        if (err3) return res.status(500).json({ success: false, error: err3.message });
+                        res.json({ success: true, comments });
+                    }
+                );
+            });
+        });
     });
 
     /* ============================================================

@@ -451,6 +451,51 @@
         .btn-redeposer:hover { background: #dc2626; }
 
         /* ============================================
+           VUE LISTE / KANBAN
+        ============================================ */
+        .view-toggle { display: inline-flex; border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden; }
+        .vt-btn {
+            border: none; background: var(--white); color: var(--gray-600);
+            padding: 0.4rem 0.8rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 0.35rem;
+        }
+        .vt-btn:hover { background: var(--gray-50); }
+        .vt-btn.active { background: var(--primary); color: var(--white); }
+
+        .kanban { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: start; }
+        .kanban-col {
+            background: #f7f8fa; border: 1px solid var(--gray-200); border-radius: 12px;
+            padding: 0.75rem; min-height: 140px; transition: background .12s, border-color .12s;
+        }
+        .kanban-col.drag-over { border-color: var(--primary); background: rgba(234,125,11,0.06); }
+        .kanban-col-head {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 0.82rem; font-weight: 700; color: var(--gray-700); margin-bottom: 0.6rem;
+            padding-bottom: 0.45rem; border-bottom: 2px solid var(--gray-200);
+        }
+        .kanban-col-head .count { background: var(--gray-200); color: var(--gray-700); border-radius: 10px; padding: 0 0.5rem; font-size: 0.72rem; }
+        .kanban-col[data-status="A_faire"] .kanban-col-head { border-bottom-color: #94a3b8; }
+        .kanban-col[data-status="En_cours"] .kanban-col-head { border-bottom-color: var(--primary); }
+        .kanban-col[data-status="Terminee"] .kanban-col-head { border-bottom-color: #16a34a; }
+        .kanban-card {
+            background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px;
+            padding: 0.6rem 0.65rem; margin-bottom: 0.55rem; cursor: grab;
+            box-shadow: 0 1px 2px rgba(15,27,45,0.04);
+        }
+        .kanban-card:active { cursor: grabbing; }
+        .kanban-card.dragging { opacity: 0.45; }
+        .kanban-card-top { display: flex; align-items: center; gap: 0.4rem; }
+        .kanban-card .kc-title { font-size: 0.84rem; font-weight: 600; color: var(--gray-900); flex: 1; }
+        .kanban-card .kc-title.done { text-decoration: line-through; color: var(--gray-400); }
+        .kanban-card .kc-jalon { font-size: 0.7rem; color: var(--gray-500); margin-top: 0.25rem; }
+        .kanban-card-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; gap: 0.4rem; }
+        .kanban-card .kc-date { font-size: 0.7rem; color: var(--gray-500); }
+        .kanban-card .kc-date.late { color: #dc2626; font-weight: 600; }
+        .kanban-card .kc-actions { display: flex; align-items: center; gap: 0.25rem; }
+        .kanban-empty { font-size: 0.78rem; color: var(--gray-400); text-align: center; padding: 0.85rem 0; }
+        @media (max-width: 820px) { .kanban { grid-template-columns: 1fr; } }
+
+        /* ============================================
            ONGLET CHAT
         ============================================ */
         .chat-layout {
@@ -761,6 +806,7 @@
                 <button class="tab active" onclick="switchTab('overview', this)">Vue d'ensemble</button>
                 <button class="tab" onclick="switchTab('subject', this)">Sujet</button>
                 <button class="tab" onclick="switchTab('tasks', this)">Jalons &amp; Tâches</button>
+                <button class="tab" onclick="switchTab('calendar', this)">Calendrier</button>
                 <button class="tab" onclick="switchTab('deliverables', this)">Livrables</button>
                 <button class="tab" onclick="switchTab('chat', this)">Chat</button>
                 <button class="tab" onclick="switchTab('evaluation', this)">Évaluation</button>
@@ -770,14 +816,25 @@
             <div id="tab-overview" class="tab-content active">
                 <div class="stats-grid" id="overviewStats"></div>
                 <div id="overviewAlert"></div>
-                <div class="card">
-                    <div class="card-title">Prochaines échéances</div>
-                    <div id="overviewDeadlines"></div>
+                <div class="two-cols">
+                    <div class="card">
+                        <div class="card-title">Répartition des tâches</div>
+                        <div style="height:240px;"><canvas id="overviewChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Prochaines échéances</div>
+                        <div id="overviewDeadlines"></div>
+                    </div>
                 </div>
                 <div class="card">
                     <div class="card-title">Activité récente</div>
                     <div class="activity-list" id="overviewActivity"></div>
                 </div>
+            </div>
+
+            <!-- ====== ONGLET CALENDRIER ====== -->
+            <div id="tab-calendar" class="tab-content">
+                <div id="projectCalendar"></div>
             </div>
 
             <!-- ====== ONGLET 2 : SUJET ====== -->
@@ -794,9 +851,15 @@
                         <button class="filter-chip" data-tfilter="En_cours">En cours</button>
                         <button class="filter-chip" data-tfilter="Terminee">Terminées</button>
                     </div>
-                    <button class="btn btn-primary" id="btnNewJalon" data-tl-only style="display:none;">
-                        <i class="fas fa-plus"></i> Nouveau jalon
-                    </button>
+                    <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+                        <div class="view-toggle" id="taskViewToggle">
+                            <button class="vt-btn active" data-view="list"><i class="fas fa-list"></i> Liste</button>
+                            <button class="vt-btn" data-view="kanban"><i class="fas fa-table-columns"></i> Kanban</button>
+                        </div>
+                        <button class="btn btn-primary" id="btnNewJalon" data-tl-only style="display:none;">
+                            <i class="fas fa-plus"></i> Nouveau jalon
+                        </button>
+                    </div>
                 </div>
                 <div id="jalonsContainer"></div>
             </div>
@@ -830,7 +893,7 @@
                         <div class="chat-composer">
                             <textarea id="chatInput" placeholder="Écrivez un message au groupe… (visible par tous les membres et l'encadrant)"></textarea>
                             <div class="chat-composer-bottom">
-                                <div class="icons"><i class="fas fa-paperclip"></i><i class="far fa-smile"></i></div>
+                                <span></span>
                                 <button class="btn btn-primary" id="btnSendMsg"><i class="fas fa-paper-plane"></i> Envoyer</button>
                             </div>
                             <div class="chat-composer-help">💡 Tous vos messages sont visibles par les membres du groupe et l'encadrant.</div>
@@ -878,7 +941,6 @@
             <div class="modal-body">
                 <div class="form-group"><label>Fichier</label><input type="file" class="form-control" id="depFile" /></div>
                 <div class="form-group"><label>Nom (optionnel)</label><input class="form-control" id="depName" placeholder="Vide = nom du fichier" /></div>
-                <div class="form-group"><label>Rattacher à</label><select class="form-control" id="depTarget"></select></div>
             </div>
             <div class="modal-foot">
                 <button class="btn btn-secondary" data-close="depositModal">Annuler</button>
@@ -887,7 +949,25 @@
         </div>
     </div>
 
+    <!-- ====== MODALE : COMMENTAIRES DE TÂCHE ====== -->
+    <div class="modal-overlay" id="taskCommentsModal">
+        <div class="modal">
+            <div class="modal-head"><h3>Commentaires de la tâche</h3><button class="close-x" data-close="taskCommentsModal">&times;</button></div>
+            <div class="modal-body">
+                <div id="taskCommentsList" style="display:flex;flex-direction:column;gap:0.5rem;max-height:300px;overflow:auto;"></div>
+                <textarea class="form-control" id="taskCommentInput" placeholder="Écrire un commentaire…" style="min-height:70px;"></textarea>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" data-close="taskCommentsModal">Fermer</button>
+                <button class="btn btn-primary" id="taskCommentSend">Envoyer</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="/ui.js"></script>
+    <script src="/calendar.js"></script>
     <script src="sidebar.js"></script>
     <script>
     /* ============================================================
@@ -924,6 +1004,7 @@
         jalons: [], tasks: [],
         deliverables: [], delivValid: 0, delivTotal: 0,
         taskFilter: "all", taskJalonId: null,
+        taskView: "list",
         chatMessages: []
     };
 
@@ -982,6 +1063,9 @@
         // de l'onglet, les nouveaux messages arrivent ensuite en direct (socket).
         if (tabName === "chat") {
             loadChat();
+        }
+        if (tabName === "calendar") {
+            renderCalendar();
         }
     }
 
@@ -1082,12 +1166,12 @@
 
     // Le Team Leader choisit le sujet du groupe (Étape 4).
     async function chooseSubject(idSujet) {
-        if (!confirm("Confirmer le choix de ce sujet pour le groupe ?")) return;
+        if (!await uiConfirm("Confirmer le choix de ce sujet pour le groupe ?", { title: "Choix du sujet", okText: "Confirmer" })) return;
         const { ok, data, status } = await api("POST", `/groups/${state.groupId}/subject`, { id_sujet: idSujet });
         if (ok) {
             location.reload();
         } else {
-            alert((data && data.message) || "Choix impossible (statut " + status + ").");
+            uiToast((data && data.message) || "Choix impossible (statut " + status + ").", "error");
         }
     }
 
@@ -1102,12 +1186,12 @@
     }
 
     async function markDelivered() {
-        if (!confirm("Marquer le groupe comme « Livré » ?\nCela indique que tous les livrables finaux ont été déposés.")) return;
+        if (!await uiConfirm("Cela indique que tous les livrables finaux ont été déposés.", { title: "Marquer le groupe comme « Livré » ?", okText: "Marquer livré" })) return;
         const { ok, data, status } = await api("POST", `/groups/${state.groupId}/deliver`);
         if (ok) {
             location.reload();
         } else {
-            alert((data && data.message) || "Action impossible (statut " + status + ").");
+            uiToast((data && data.message) || "Action impossible (statut " + status + ").", "error");
         }
     }
 
@@ -1202,10 +1286,14 @@
 
     function renderJalons() {
         const c = document.getElementById("jalonsContainer");
+        // Les filtres par statut n'ont de sens qu'en vue Liste.
+        const filtersEl = document.getElementById("taskFilters");
+        if (filtersEl) filtersEl.style.display = state.taskView === "kanban" ? "none" : "";
         if (!state.jalons.length) {
             c.innerHTML = `<div class="empty-state">Aucun jalon pour l'instant.${state.isTeamLeader ? " Cliquez sur « Nouveau jalon » pour démarrer." : ""}</div>`;
             return;
         }
+        if (state.taskView === "kanban") { renderKanban(); return; }
         const f = state.taskFilter;
         c.innerHTML = state.jalons.map(j => {
             const total = j.tasks.length;
@@ -1228,7 +1316,6 @@
                     <div class="assignees">${assigneesHtml}</div>
                     <span class="date ${late ? "late" : ""}">${t.date ? fmtShort(t.date) : ""}${late ? " (En retard)" : ""}</span>
                     <button class="icon-btn" title="Commenter" data-comment-task="${t.id_tache}"><i class="fas fa-comment"></i></button>
-                    <button class="icon-btn" title="Déposer un livrable" data-deposit-task="${t.id_tache}"><i class="fas fa-paperclip"></i></button>
                     <button class="icon-btn danger" title="Supprimer la tâche" data-del-task="${t.id_tache}" data-tl-only><i class="fas fa-trash"></i></button>
                 </div>`;
             }).join("") || `<div class="empty-state" style="padding:0.75rem;">Aucune tâche${f !== "all" ? " pour ce filtre" : ""}.</div>`;
@@ -1256,6 +1343,83 @@
         attachJalonHandlers();
     }
 
+    /* ---------- Vue Kanban ---------- */
+    function renderKanban() {
+        const c = document.getElementById("jalonsContainer");
+        const cols = [
+            { key: "A_faire", label: "À faire" },
+            { key: "En_cours", label: "En cours" },
+            { key: "Terminee", label: "Terminé" }
+        ];
+        const allTasks = state.jalons.flatMap(j => j.tasks.map(t => ({ ...t, jalonTitre: j.titre })));
+        c.innerHTML = `<div class="kanban">` + cols.map(col => {
+            const tasks = allTasks.filter(t => t.statut === col.key);
+            const cards = tasks.map(kanbanCardHtml).join("") || `<div class="kanban-empty">Aucune tâche</div>`;
+            return `<div class="kanban-col" data-status="${col.key}">
+                <div class="kanban-col-head"><span>${col.label}</span><span class="count">${tasks.length}</span></div>
+                <div class="kanban-col-body">${cards}</div>
+            </div>`;
+        }).join("") + `</div>`;
+        attachKanbanHandlers();
+        applyRole(state.isTeamLeader); // affiche/masque les boutons data-tl-only
+    }
+
+    function kanbanCardHtml(t) {
+        const late = t.date && new Date(t.date) < new Date() && t.statut !== "Terminee";
+        const assigneesHtml = (t.assignes || []).map(id => {
+            const m = state.members.find(x => String(x.id_utilisateur) === String(id));
+            const ini = m ? initials(m.prenom, m.nom) : "?";
+            const nm = m ? (m.prenom + " " + m.nom) : ("#" + id);
+            return `<div class="assignee-avatar" title="${esc(nm)}">${esc(ini)}</div>`;
+        }).join("");
+        return `<div class="kanban-card" draggable="true" data-task="${t.id_tache}">
+            <div class="kanban-card-top">
+                <div class="priority ${PRIO_CLASS[t.priorite] || ""}" title="Priorité ${esc(t.priorite || "")}"></div>
+                <div class="kc-title ${t.statut === "Terminee" ? "done" : ""}">${esc(t.titre)}</div>
+            </div>
+            <div class="kc-jalon"><i class="fas fa-flag" style="font-size:0.62rem;"></i> ${esc(t.jalonTitre)}</div>
+            <div class="kanban-card-bottom">
+                <span class="kc-date ${late ? "late" : ""}">${t.date ? fmtShort(t.date) : ""}${late ? " (retard)" : ""}</span>
+                <div class="kc-actions">
+                    <div class="assignees" style="display:inline-flex;">${assigneesHtml}</div>
+                    <button class="icon-btn" title="Commenter" data-comment-task="${t.id_tache}"><i class="fas fa-comment"></i></button>
+                    <button class="icon-btn danger" title="Supprimer la tâche" data-del-task="${t.id_tache}" data-tl-only><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function attachKanbanHandlers() {
+        let draggedId = null;
+        document.querySelectorAll(".kanban-card").forEach(card => {
+            card.addEventListener("dragstart", (e) => {
+                draggedId = card.dataset.task;
+                e.dataTransfer.setData("text/plain", card.dataset.task);
+                e.dataTransfer.effectAllowed = "move";
+                card.classList.add("dragging");
+            });
+            card.addEventListener("dragend", () => { draggedId = null; card.classList.remove("dragging"); });
+        });
+        document.querySelectorAll(".kanban-col").forEach(col => {
+            col.addEventListener("dragover", (e) => { e.preventDefault(); col.classList.add("drag-over"); });
+            col.addEventListener("dragleave", () => col.classList.remove("drag-over"));
+            col.addEventListener("drop", async (e) => {
+                e.preventDefault();
+                col.classList.remove("drag-over");
+                const id = draggedId || e.dataTransfer.getData("text/plain");
+                if (!id) return;
+                const newStatut = col.dataset.status;
+                const task = state.tasks.find(t => String(t.id_tache) === String(id));
+                if (task && task.statut === newStatut) return; // déjà dans cette colonne
+                const { ok, status } = await api("PATCH", `/tasks/${id}/status`, { statut: newStatut });
+                if (ok) loadMilestones();
+                else uiToast(status === 403 ? "Action réservée à un assigné de la tâche ou au Team Leader du groupe." : "Erreur lors du changement de statut.", "error");
+            });
+        });
+        document.querySelectorAll(".kanban-card [data-comment-task]").forEach(b => b.onclick = (e) => { e.stopPropagation(); commentTask(b.dataset.commentTask); });
+        document.querySelectorAll(".kanban-card [data-del-task]").forEach(b => b.onclick = (e) => { e.stopPropagation(); deleteTask(b.dataset.delTask); });
+    }
+
     function attachJalonHandlers() {
         document.querySelectorAll(".status-select").forEach(sel => {
             sel.addEventListener("change", async () => {
@@ -1264,7 +1428,7 @@
                 if (ok) { sel.dataset.prev = val; loadMilestones(); }
                 else {
                     sel.value = prev;
-                    alert(status === 403 ? "Action réservée à un assigné de la tâche ou au Team Leader du groupe." : "Erreur lors du changement de statut.");
+                    uiToast(status === 403 ? "Action réservée à un assigné de la tâche ou au Team Leader du groupe." : "Erreur lors du changement de statut.", "error");
                 }
             });
         });
@@ -1272,39 +1436,42 @@
         document.querySelectorAll("[data-del-jalon]").forEach(b => b.onclick = () => delJalon(b.dataset.delJalon));
         document.querySelectorAll("[data-new-task]").forEach(b => b.onclick = () => openTaskModal(b.dataset.newTask));
         document.querySelectorAll("[data-comment-task]").forEach(b => b.onclick = () => commentTask(b.dataset.commentTask));
-        document.querySelectorAll("[data-deposit-task]").forEach(b => b.onclick = () => openDepositModal(b.dataset.depositTask, null));
         document.querySelectorAll("[data-del-task]").forEach(b => b.onclick = () => deleteTask(b.dataset.delTask));
     }
 
     async function deleteTask(id) {
-        if (!confirm("Supprimer cette tâche ?\n(Les commentaires et livrables liés seront aussi supprimés.)")) return;
+        if (!await uiConfirm("Les commentaires et livrables liés seront aussi supprimés.", { title: "Supprimer cette tâche ?", danger: true, okText: "Supprimer" })) return;
         const { ok, status, data } = await api("DELETE", `/tasks/${id}`);
         if (ok) loadMilestones();
-        else alert((data && data.message) || (status === 403 ? "Réservé au Team Leader." : "Erreur."));
+        else uiToast((data && data.message) || (status === 403 ? "Réservé au Team Leader." : "Erreur."), "error");
     }
 
-    function newJalon() {
-        const titre = prompt("Titre du nouveau jalon :");
+    async function newJalon() {
+        const titre = await uiPrompt("Titre du nouveau jalon :", { title: "Nouveau jalon", okText: "Suivant" });
         if (!titre) return;
-        const description = prompt("Description (optionnel) :") || "";
-        const date_limite = prompt("Date limite (AAAA-MM-JJ) :");
+        const description = await uiPrompt("Description (optionnel) :", { title: "Nouveau jalon", multiline: true, okText: "Suivant" });
+        if (description === null) return;
+        const date_limite = await uiPrompt("Date limite (AAAA-MM-JJ) :", { title: "Nouveau jalon", placeholder: "2026-09-30", okText: "Créer" });
         if (!date_limite) return;
-        api("POST", `/groups/${state.groupId}/milestones`, { titre, description, date_limite })
-            .then(r => r.ok ? loadMilestones() : alert(r.status === 403 ? "Action réservée au Team Leader." : "Erreur."));
+        const r = await api("POST", `/groups/${state.groupId}/milestones`, { titre, description, date_limite });
+        if (r.ok) loadMilestones();
+        else uiToast(r.status === 403 ? "Action réservée au Team Leader." : "Erreur.", "error");
     }
-    function editJalon(id) {
+    async function editJalon(id) {
         const j = state.jalons.find(x => String(x.id_jalon) === String(id));
         if (!j) return;
-        const titre = prompt("Titre du jalon :", j.titre); if (titre === null) return;
-        const description = prompt("Description :", j.description || ""); if (description === null) return;
-        const date_limite = prompt("Date limite (AAAA-MM-JJ) :", (j.date_limite || "").slice(0, 10)); if (date_limite === null) return;
-        api("PUT", `/milestones/${id}`, { titre, description, date_limite })
-            .then(r => r.ok ? loadMilestones() : alert(r.status === 403 ? "Action réservée au Team Leader." : "Erreur."));
+        const titre = await uiPrompt("Titre du jalon :", { title: "Modifier le jalon", defaultValue: j.titre, okText: "Suivant" }); if (titre === null) return;
+        const description = await uiPrompt("Description :", { title: "Modifier le jalon", defaultValue: j.description || "", multiline: true, okText: "Suivant" }); if (description === null) return;
+        const date_limite = await uiPrompt("Date limite (AAAA-MM-JJ) :", { title: "Modifier le jalon", defaultValue: (j.date_limite || "").slice(0, 10), okText: "Enregistrer" }); if (date_limite === null) return;
+        const r = await api("PUT", `/milestones/${id}`, { titre, description, date_limite });
+        if (r.ok) loadMilestones();
+        else uiToast(r.status === 403 ? "Action réservée au Team Leader." : "Erreur.", "error");
     }
-    function delJalon(id) {
-        if (!confirm("Supprimer ce jalon et toutes ses tâches ?")) return;
-        api("DELETE", `/milestones/${id}`)
-            .then(r => r.ok ? loadMilestones() : alert(r.status === 403 ? "Action réservée au Team Leader." : "Erreur."));
+    async function delJalon(id) {
+        if (!await uiConfirm("Toutes ses tâches seront aussi supprimées.", { title: "Supprimer ce jalon ?", danger: true, okText: "Supprimer" })) return;
+        const r = await api("DELETE", `/milestones/${id}`);
+        if (r.ok) loadMilestones();
+        else uiToast(r.status === 403 ? "Action réservée au Team Leader." : "Erreur.", "error");
     }
 
     /* --- Modale nouvelle tâche --- */
@@ -1321,22 +1488,38 @@
     }
     document.getElementById("taskSubmit").onclick = async () => {
         const titre = document.getElementById("taskTitle").value.trim();
-        if (!titre) { alert("Le titre est requis."); return; }
+        if (!titre) { uiToast("Le titre est requis.", "error"); return; }
         const description = document.getElementById("taskDesc").value.trim();
         const date_limite = document.getElementById("taskDate").value;
-        if (!date_limite) { alert("La date limite est requise."); return; }
+        if (!date_limite) { uiToast("La date limite est requise.", "error"); return; }
         const priorite = document.getElementById("taskPrio").value;
         const assignees = [...document.querySelectorAll("#taskAssignees input:checked")].map(i => Number(i.value));
         const { ok, status } = await api("POST", `/milestones/${state.taskJalonId}/tasks`, { titre, description, date_limite, priorite, assignees });
         if (ok) { closeModal("taskModal"); loadMilestones(); }
-        else alert(status === 403 ? "Action réservée au Team Leader." : (status === 400 ? "Tous les assignés doivent être membres du groupe." : "Erreur lors de la création."));
+        else uiToast(status === 403 ? "Action réservée au Team Leader." : (status === 400 ? "Tous les assignés doivent être membres du groupe." : "Erreur lors de la création."), "error");
     };
 
+    let currentTaskCommentId = null;
     async function commentTask(id) {
-        const contenu = prompt("Votre commentaire sur la tâche :");
-        if (!contenu) return;
-        const { ok, status } = await api("POST", `/tasks/${id}/comments`, { contenu });
-        alert(ok ? "Commentaire ajouté." : (status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur."));
+        currentTaskCommentId = id;
+        document.getElementById("taskCommentInput").value = "";
+        openModal("taskCommentsModal");
+        await loadTaskComments(id);
+    }
+    async function loadTaskComments(id) {
+        const list = document.getElementById("taskCommentsList");
+        list.innerHTML = `<div class="empty-state" style="padding:0.5rem;">Chargement…</div>`;
+        const { ok, data } = await api("GET", `/tasks/${id}/comments`);
+        if (!ok) { list.innerHTML = `<div class="empty-state" style="padding:0.5rem;">Erreur de chargement.</div>`; return; }
+        const comments = data.comments || [];
+        list.innerHTML = comments.length ? comments.map(c => {
+            const enc = !!c.est_encadrant;
+            return `<div style="font-size:0.82rem; border-bottom:1px solid var(--gray-100); padding-bottom:0.4rem;">
+                <span style="font-weight:600; color:${enc ? "var(--primary)" : "var(--gray-900)"};">${esc(c.prenom)} ${esc(c.nom)}${enc ? " · Encadrant" : ""}</span>
+                <span style="color:var(--gray-400); font-size:0.7rem; margin-left:0.4rem;">${fmtDate(c.date_creation)}</span>
+                <div style="color:var(--gray-700);">${esc(c.contenu)}</div>
+            </div>`;
+        }).join("") : `<div class="empty-state" style="padding:0.5rem;">Aucun commentaire.</div>`;
     }
 
     /* ============================================================
@@ -1374,11 +1557,49 @@
                 <span class="deadline-date">${fmtShort(d.date)}</span>
                 <span class="badge ${d.badge}">${d.type}</span>
             </div>`).join("") || `<div class="empty-state">Aucune échéance à venir.</div>`;
+
+        const aFaire = all.filter(t => t.statut === "A_faire").length;
+        const enCours = all.filter(t => t.statut === "En_cours").length;
+        renderOverviewChart(aFaire, enCours, done);
+    }
+
+    let overviewChart = null;
+    function renderOverviewChart(aFaire, enCours, termine) {
+        const el = document.getElementById("overviewChart");
+        if (!el || typeof Chart === "undefined") return;
+        const data = [aFaire, enCours, termine];
+        if (overviewChart) { overviewChart.data.datasets[0].data = data; overviewChart.update(); return; }
+        overviewChart = new Chart(el, {
+            type: "doughnut",
+            data: { labels: ["À faire", "En cours", "Terminé"], datasets: [{ data, backgroundColor: ["#94a3b8", "#ea7d0b", "#16a34a"] }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+        });
     }
 
     /* ============================================================
-       LIVRABLES
+       CALENDRIER DU PROJET
     ============================================================ */
+    function buildCalendarEvents() {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const events = [];
+        (state.jalons || []).forEach(j => {
+            if (j.date_limite) events.push({ date: j.date_limite, label: "Jalon : " + j.titre, type: "jalon" });
+        });
+        (state.tasks || []).forEach(t => {
+            if (t.date) {
+                const late = new Date(t.date) < today && t.statut !== "Terminee";
+                events.push({ date: t.date, label: t.titre, type: "tache", late });
+            }
+        });
+        if (state.project) {
+            if (state.project.date_debut) events.push({ date: state.project.date_debut, label: "Début projet", type: "projet" });
+            if (state.project.date_fin) events.push({ date: state.project.date_fin, label: "Soutenance", type: "projet" });
+        }
+        return events;
+    }
+    function renderCalendar() {
+        createCalendar("projectCalendar", buildCalendarEvents());
+    }
     async function loadDeliverables() {
         const { ok, data } = await api("GET", `/groups/${state.groupId}/deliverables`);
         if (!ok) return;
@@ -1414,14 +1635,14 @@
                         <strong><i class="fas fa-exclamation-triangle"></i> À corriger par le groupe</strong>
                         <p>${esc(d.commentaire_validation || "Aucun commentaire de l'encadrant.")}</p>
                     </div>
-                    <button class="btn-redeposer" data-redep-task="${d.id_tache || ""}" data-redep-group="${d.id_groupe || ""}"><i class="fas fa-redo"></i> Redéposer</button>
+                    <button class="btn-redeposer" data-redep><i class="fas fa-redo"></i> Redéposer</button>
                 </div>` : "";
             return `<div>
                 <div class="deliv-card ${d.statut_validation === "Refuse" ? "refused" : ""}">
                     <div class="deliv-icon"><i class="fas fa-file"></i></div>
                     <div class="deliv-info">
                         <div class="name">${esc(d.nom)}</div>
-                        <div class="meta">Déposé par ${esc(d.deposant_prenom || "")} ${esc(d.deposant_nom || "")}${d.tache_titre ? " · Tâche : " + esc(d.tache_titre) : " · Groupe global"} · ${fmtDate(d.date_depot)}</div>
+                        <div class="meta">Déposé par ${esc(d.deposant_prenom || "")} ${esc(d.deposant_nom || "")} · ${fmtDate(d.date_depot)}</div>
                     </div>
                     <div style="display:flex; gap:0.5rem; align-items:center;">
                         <span class="badge ${meta[0]}"><i class="fas ${meta[1]}"></i> ${meta[2]}</span>
@@ -1430,69 +1651,73 @@
                         ${canDel ? `<button class="icon-btn" title="Supprimer" data-del-deliv="${d.id_livrable}"><i class="fas fa-trash"></i></button>` : ""}
                     </div>
                 </div>${refused}
+                <div class="deliv-comments" id="dc-${d.id_livrable}"></div>
             </div>`;
         };
-        const byTask = list.filter(d => d.id_tache && keep(d)).map(card).join("") || `<div class="empty-state">Aucun livrable de tâche.</div>`;
-        const byGroup = list.filter(d => d.id_groupe && keep(d)).map(card).join("") || `<div class="empty-state">Aucun livrable final de groupe.</div>`;
+        const items = list.filter(keep).map(card).join("") || `<div class="empty-state">Aucun livrable déposé.</div>`;
         document.getElementById("delivContainer").innerHTML = `
             <div class="deliv-section">
-                <div class="deliv-section-title">Livrables par tâche</div>
-                <div class="deliv-section-help">Rattachés à des tâches spécifiques du projet.</div>
-                ${byTask}
-            </div>
-            <div class="deliv-section">
-                <div class="deliv-section-title">Livrables finaux du groupe</div>
-                <div class="deliv-section-help">Doivent tous être validés par l'encadrant pour passer à « Livré ».</div>
-                ${byGroup}
+                <div class="deliv-section-title">Livrables du groupe</div>
+                <div class="deliv-section-help">Documents déposés par les membres. Doivent être validés par l'encadrant pour passer à « Livré ».</div>
+                ${items}
             </div>`;
         document.querySelectorAll("[data-comment-deliv]").forEach(b => b.onclick = () => commentDeliv(b.dataset.commentDeliv));
-        document.querySelectorAll("[data-redep-task]").forEach(b => b.onclick = () => openDepositModal(b.dataset.redepTask || null, b.dataset.redepGroup || null));
+        document.querySelectorAll("[data-redep]").forEach(b => b.onclick = () => openDepositModal());
         document.querySelectorAll("[data-del-deliv]").forEach(b => b.onclick = () => deleteDeliverable(b.dataset.delDeliv));
+        list.filter(keep).forEach(d => loadDelivComments(d.id_livrable));
+    }
+
+    async function loadDelivComments(livId) {
+        const box = document.getElementById("dc-" + livId);
+        if (!box) return;
+        const { ok, data } = await api("GET", `/deliverables/${livId}/comments`);
+        if (!ok) return;
+        const comments = data.comments || [];
+        if (!comments.length) { box.innerHTML = ""; return; }
+        box.innerHTML = `<div style="margin:0.4rem 0 0.2rem 0.5rem; padding-left:0.6rem; border-left:2px solid var(--gray-200); display:flex; flex-direction:column; gap:0.4rem;">`
+            + comments.map(c => {
+                const enc = !!c.est_encadrant;
+                return `<div style="font-size:0.78rem;">
+                    <span style="font-weight:600; color:${enc ? "var(--primary)" : "var(--gray-800)"};">${esc(c.prenom)} ${esc(c.nom)}${enc ? " · Encadrant" : ""}</span>
+                    <span style="color:var(--gray-400); font-size:0.7rem; margin-left:0.4rem;">${fmtDate(c.date_creation)}</span>
+                    <div style="color:var(--gray-700);">${esc(c.contenu)}</div>
+                </div>`;
+            }).join("")
+            + `</div>`;
     }
 
     async function deleteDeliverable(id) {
-        if (!confirm("Supprimer ce livrable ? (Vous pourrez en redéposer un nouveau.)")) return;
+        if (!await uiConfirm("Vous pourrez en redéposer un nouveau.", { title: "Supprimer ce livrable ?", danger: true, okText: "Supprimer" })) return;
         const { ok, data, status } = await api("DELETE", `/deliverables/${id}`);
         if (ok) { loadDeliverables(); }
-        else alert((data && data.message) || "Suppression impossible (statut " + status + ").");
+        else uiToast((data && data.message) || "Suppression impossible (statut " + status + ").", "error");
     }
 
     async function commentDeliv(id) {
-        const contenu = prompt("Votre commentaire sur le livrable :");
+        const contenu = await uiPrompt("Votre commentaire sur le livrable :", { title: "Commenter le livrable", multiline: true, okText: "Envoyer" });
         if (!contenu) return;
         const { ok, status } = await api("POST", `/deliverables/${id}/comments`, { contenu });
-        alert(ok ? "Commentaire ajouté." : (status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur."));
+        if (ok) { uiToast("Commentaire ajouté.", "success"); loadDelivComments(id); }
+        else uiToast(status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur.", "error");
     }
 
-    /* --- Modale dépôt de livrable --- */
-    function buildTargetOptions(selected) {
-        let opts = `<option value="group" ${selected === "group" ? "selected" : ""}>Groupe global (livrable final)</option>`;
-        state.tasks.forEach(t => {
-            const v = "task:" + t.id_tache;
-            opts += `<option value="${v}" ${selected === v ? "selected" : ""}>Tâche : ${esc(t.titre)}</option>`;
-        });
-        return opts;
-    }
-    function openDepositModal(taskId, groupId) {
-        const sel = taskId ? "task:" + taskId : "group";
-        document.getElementById("depTarget").innerHTML = buildTargetOptions(sel);
+    /* --- Modale dépôt de livrable (toujours rattaché au groupe) --- */
+    function openDepositModal() {
         document.getElementById("depFile").value = "";
         document.getElementById("depName").value = "";
         openModal("depositModal");
     }
     document.getElementById("depSubmit").onclick = async () => {
         const file = document.getElementById("depFile").files[0];
-        if (!file) { alert("Sélectionnez un fichier."); return; }
-        const target = document.getElementById("depTarget").value;
+        if (!file) { uiToast("Sélectionnez un fichier.", "error"); return; }
         const fd = new FormData();
         fd.append("fichier", file);
         const nom = document.getElementById("depName").value.trim();
         if (nom) fd.append("nom", nom);
-        if (target === "group") fd.append("id_groupe", state.groupId);
-        else fd.append("id_tache", target.split(":")[1]);
+        fd.append("id_groupe", state.groupId);
         const { ok, status } = await api("POST", "/deliverables", fd, true);
-        if (ok) { closeModal("depositModal"); loadDeliverables(); }
-        else alert(status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur lors du dépôt.");
+        if (ok) { closeModal("depositModal"); loadDeliverables(); uiToast("Livrable déposé.", "success"); }
+        else uiToast(status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur lors du dépôt.", "error");
     };
 
     /* ============================================================
@@ -1567,7 +1792,7 @@
         if (nearBottom) c.scrollTop = c.scrollHeight;
     }
     async function deleteMessage(id) {
-        if (!confirm("Supprimer ce message ?")) return;
+        if (!await uiConfirm("Supprimer ce message ?", { title: "Supprimer le message", danger: true, okText: "Supprimer" })) return;
         const { ok } = await api("DELETE", `/groups/${state.groupId}/messages/${id}`);
         if (ok) {
             // La suppression revient via le socket. Secours si socket déconnecté :
@@ -1575,7 +1800,7 @@
                 state.chatMessages = state.chatMessages.filter(m => String(m.id_message) !== String(id));
                 renderMessages(state.chatMessages);
             }
-        } else alert("Suppression impossible.");
+        } else uiToast("Suppression impossible.", "error");
     }
     async function sendMessage() {
         const ta = document.getElementById("chatInput");
@@ -1588,7 +1813,7 @@
             // déconnecté), on recharge le fil pour ne rien perdre.
             if (!chatSocket || !chatSocket.connected) loadChat();
         }
-        else alert("Erreur lors de l'envoi.");
+        else uiToast("Erreur lors de l'envoi.", "error");
     }
 
     /* ============================================================
@@ -1674,7 +1899,7 @@
 
     // Boutons statiques
     document.getElementById("btnNewJalon").onclick = newJalon;
-    document.getElementById("btnDeposit").onclick = () => openDepositModal(null, state.groupId);
+    document.getElementById("btnDeposit").onclick = () => openDepositModal();
     document.getElementById("btnSendMsg").onclick = sendMessage;
     document.getElementById("btnDeliver").onclick = markDelivered;
     document.querySelectorAll("#taskFilters .filter-chip").forEach(chip => {
@@ -1685,6 +1910,25 @@
             renderJalons();
         };
     });
+    document.querySelectorAll("#taskViewToggle .vt-btn").forEach(btn => {
+        btn.onclick = () => {
+            if (btn.dataset.view === state.taskView) return;
+            document.querySelectorAll("#taskViewToggle .vt-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.taskView = btn.dataset.view;
+            renderJalons();
+        };
+    });
+    document.getElementById("taskCommentSend").onclick = async () => {
+        const contenu = document.getElementById("taskCommentInput").value.trim();
+        if (!contenu) { uiToast("Commentaire vide.", "error"); return; }
+        const { ok, status } = await api("POST", `/tasks/${currentTaskCommentId}/comments`, { contenu });
+        if (ok) {
+            document.getElementById("taskCommentInput").value = "";
+            loadTaskComments(currentTaskCommentId);
+            uiToast("Commentaire ajouté.", "success");
+        } else uiToast(status === 403 ? "Vous n'êtes pas membre de ce groupe." : "Erreur.", "error");
+    };
 
     init();
     </script>

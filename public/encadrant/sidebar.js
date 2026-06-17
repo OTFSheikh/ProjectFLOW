@@ -2,6 +2,7 @@ function renderSidebar(activePage) {
     const links = [
         { id: "dashboard", label: "Tableau de bord", icon: "fas fa-th-large", href: "/encadrant/dashboard.html" },
         { id: "projects", label: "Projets", icon: "fas fa-folder", href: "/encadrant/projects.html" },
+        { id: "notifications", label: "Notifications", icon: "fas fa-bell", href: "/encadrant/notifications.html" },
         { id: "notes", label: "Notes d'entrevue", icon: "fas fa-file-alt", href: "/encadrant/notes.html" },
         { id: "evaluations", label: "Évaluations", icon: "fas fa-chart-bar", href: "/encadrant/evaluations.html" },
         { id: "profile", label: "Profil", icon: "fas fa-user", href: "/encadrant/profile.html" },

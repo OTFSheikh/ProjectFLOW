@@ -37,6 +37,53 @@ module.exports = function (db) {
         });
     });
 
+    // Données agrégées pour les graphiques du dashboard encadrant.
+    router.get("/dashboard/charts", (req, res) => {
+        const userId = req.session.userId;
+        const qTasks = `
+            SELECT t.statut, COUNT(*) AS n
+            FROM Tache t JOIN Jalon j ON t.id_jalon = j.id_jalon
+            JOIN Groupe g ON j.id_groupe = g.id_groupe
+            JOIN Projet p ON g.id_projet = p.id_projet
+            WHERE p.id_utilisateur = ? GROUP BY t.statut`;
+        const qGroups = `
+            SELECT g.etat, COUNT(*) AS n
+            FROM Groupe g JOIN Projet p ON g.id_projet = p.id_projet
+            WHERE p.id_utilisateur = ? GROUP BY g.etat`;
+        const qProgress = `
+            SELECT p.id_projet, p.nom,
+                   COUNT(t.id_tache) AS total,
+                   SUM(CASE WHEN t.statut = 'Terminee' THEN 1 ELSE 0 END) AS done
+            FROM Projet p
+            LEFT JOIN Groupe g ON g.id_projet = p.id_projet
+            LEFT JOIN Jalon j ON j.id_groupe = g.id_groupe
+            LEFT JOIN Tache t ON t.id_jalon = j.id_jalon
+            WHERE p.id_utilisateur = ?
+            GROUP BY p.id_projet ORDER BY p.date_debut DESC`;
+
+        db.query(qTasks, [userId], (e1, r1) => {
+            if (e1) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            db.query(qGroups, [userId], (e2, r2) => {
+                if (e2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                db.query(qProgress, [userId], (e3, r3) => {
+                    if (e3) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    res.json({
+                        success: true,
+                        tasksByStatus: r1,
+                        groupsByState: r2,
+                        progressByProject: r3.map(p => ({
+                            id_projet: p.id_projet,
+                            nom: p.nom,
+                            total: Number(p.total),
+                            done: Number(p.done),
+                            pct: p.total > 0 ? Math.round(p.done / p.total * 100) : 0
+                        }))
+                    });
+                });
+            });
+        });
+    });
+
     // --- PROJETS ---
     router.get("/projects", (req, res) => {
         const userId = req.session.userId;
@@ -370,7 +417,7 @@ module.exports = function (db) {
     // --- TÂCHES (lecture seule) ---
     router.get("/groups/:id/tasks", (req, res) => {
         db.query(
-            `SELECT t.*, j.titre AS jalon_titre,
+            `SELECT t.*, j.titre AS jalon_titre, j.date_limite AS jalon_date,
                 GROUP_CONCAT(CONCAT(u.prenom, ' ', u.nom) SEPARATOR ', ') AS assignes
              FROM Tache t
              JOIN Jalon j ON t.id_jalon = j.id_jalon
@@ -518,18 +565,23 @@ module.exports = function (db) {
 
     // --- LIVRABLES ---
     router.get("/groups/:id/deliverables", (req, res) => {
-        db.query(
-            `SELECT l.*, u.nom AS deposant_nom, u.prenom AS deposant_prenom
-             FROM Livrable l
-             JOIN Utilisateur u ON l.id_etudiant_deposant = u.id_utilisateur
-             WHERE l.id_groupe = ?
-             ORDER BY l.date_depot DESC`,
-            [req.params.id],
-            (err, results) => {
-                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
-                res.json({ success: true, deliverables: results });
-            }
-        );
+        ownsGroup(req.session.userId, req.params.id, (err, grp) => {
+            if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            if (!grp) return res.status(403).json({ success: false, message: "Accès refusé" });
+
+            db.query(
+                `SELECT l.*, u.nom AS deposant_nom, u.prenom AS deposant_prenom
+                 FROM Livrable l
+                 JOIN Utilisateur u ON l.id_etudiant_deposant = u.id_utilisateur
+                 WHERE l.id_groupe = ?
+                 ORDER BY l.date_depot DESC`,
+                [req.params.id],
+                (err2, results) => {
+                    if (err2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    res.json({ success: true, deliverables: results });
+                }
+            );
+        });
     });
 
     router.patch("/deliverables/:id/validate", (req, res) => {
@@ -541,42 +593,105 @@ module.exports = function (db) {
             return res.status(400).json({ success: false, message: "Statut invalide" });
         }
 
-        db.query(
-            "UPDATE Livrable SET statut_validation = ?, commentaire_validation = ?, date_validation = NOW(), id_encadrant_validant = ? WHERE id_livrable = ?",
-            [statut, commentaire || null, req.session.userId, req.params.id],
-            (err, result) => {
-                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
-                if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+        // Vérifie que ce livrable appartient à un groupe d'un projet de cet encadrant.
+        const sqlOwn = `
+            SELECT p.id_utilisateur AS owner
+            FROM Livrable l
+            JOIN Groupe g ON g.id_groupe = l.id_groupe
+            JOIN Projet p ON p.id_projet = g.id_projet
+            WHERE l.id_livrable = ?
+        `;
+        db.query(sqlOwn, [req.params.id], (errOwn, ownRows) => {
+            if (errOwn) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            if (ownRows.length === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+            if (ownRows[0].owner !== req.session.userId) return res.status(403).json({ success: false, message: "Accès refusé" });
 
-                // Notifier l'étudiant qui a déposé le livrable (feedback encadrant)
-                const sqlInfo = `
-                    SELECT l.nom, l.id_etudiant_deposant,
-                           COALESCE(g.id_projet, gp.id_projet) AS id_projet
-                    FROM Livrable l
-                    LEFT JOIN Groupe g  ON g.id_groupe = l.id_groupe
-                    LEFT JOIN Tache t   ON t.id_tache = l.id_tache
-                    LEFT JOIN Jalon j   ON j.id_jalon = t.id_jalon
-                    LEFT JOIN Groupe gp ON gp.id_groupe = j.id_groupe
-                    WHERE l.id_livrable = ?
-                `;
-                db.query(sqlInfo, [req.params.id], (e2, rows) => {
-                    if (!e2 && rows.length) {
-                        const r = rows[0];
-                        const type = statut === "Valide" ? "validation" : "refus";
-                        const contenu = statut === "Valide"
-                            ? `Votre livrable « ${r.nom} » a été validé`
-                            : `Votre livrable « ${r.nom} » a été refusé — à corriger`;
-                        db.query(
-                            "INSERT INTO Notification (contenu, type, id_projet, id_utilisateur) VALUES (?, ?, ?, ?)",
-                            [contenu, type, r.id_projet || null, r.id_etudiant_deposant],
-                            () => res.json({ success: true, message: "Livrable mis à jour" })
-                        );
-                    } else {
-                        res.json({ success: true, message: "Livrable mis à jour" });
-                    }
-                });
-            }
+            db.query(
+                "UPDATE Livrable SET statut_validation = ?, commentaire_validation = ?, date_validation = NOW(), id_encadrant_validant = ? WHERE id_livrable = ?",
+                [statut, commentaire || null, req.session.userId, req.params.id],
+                (err, result) => {
+                    if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+
+                    // Notifier l'étudiant qui a déposé le livrable (feedback encadrant)
+                    const sqlInfo = `
+                        SELECT l.nom, l.id_etudiant_deposant, g.id_projet
+                        FROM Livrable l
+                        JOIN Groupe g ON g.id_groupe = l.id_groupe
+                        WHERE l.id_livrable = ?
+                    `;
+                    db.query(sqlInfo, [req.params.id], (e2, rows) => {
+                        if (!e2 && rows.length) {
+                            const r = rows[0];
+                            const type = statut === "Valide" ? "validation" : "refus";
+                            const contenu = statut === "Valide"
+                                ? `Votre livrable « ${r.nom} » a été validé`
+                                : `Votre livrable « ${r.nom} » a été refusé — à corriger`;
+                            db.query(
+                                "INSERT INTO Notification (contenu, type, id_projet, id_utilisateur) VALUES (?, ?, ?, ?)",
+                                [contenu, type, r.id_projet || null, r.id_etudiant_deposant],
+                                () => res.json({ success: true, message: "Livrable mis à jour" })
+                            );
+                        } else {
+                            res.json({ success: true, message: "Livrable mis à jour" });
+                        }
+                    });
+                }
+            );
+        });
+    });
+
+    // --- COMMENTAIRES LIVRABLE (encadrant) ---
+    // L'encadrant ne voit QUE les commentaires d'encadrants (jamais ceux des étudiants).
+    // Ses propres commentaires, eux, sont visibles de tous les membres (via la route étudiant).
+    function ownsLivrable(userId, livId, cb) {
+        db.query(
+            `SELECT p.id_utilisateur AS owner
+             FROM Livrable l
+             JOIN Groupe g ON g.id_groupe = l.id_groupe
+             JOIN Projet p ON p.id_projet = g.id_projet
+             WHERE l.id_livrable = ?`,
+            [livId],
+            (err, rows) => cb(err, rows && rows.length ? (rows[0].owner === userId) : null)
         );
+    }
+
+    router.get("/deliverables/:id/comments", (req, res) => {
+        ownsLivrable(req.session.userId, req.params.id, (err, owned) => {
+            if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            if (owned === null) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+            if (!owned) return res.status(403).json({ success: false, message: "Accès refusé" });
+            db.query(
+                `SELECT c.id_commentaire, c.contenu, c.date_creation, c.id_utilisateur,
+                        u.nom, u.prenom, u.est_encadrant
+                 FROM Commentaire c JOIN Utilisateur u ON u.id_utilisateur = c.id_utilisateur
+                 WHERE c.id_livrable = ? AND u.est_encadrant = 1
+                 ORDER BY c.date_creation ASC`,
+                [req.params.id],
+                (e2, comments) => {
+                    if (e2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    res.json({ success: true, comments });
+                }
+            );
+        });
+    });
+
+    router.post("/deliverables/:id/comments", (req, res) => {
+        const { contenu } = req.body;
+        if (!contenu || !contenu.trim()) return res.status(400).json({ success: false, message: "Commentaire vide" });
+        ownsLivrable(req.session.userId, req.params.id, (err, owned) => {
+            if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            if (owned === null) return res.status(404).json({ success: false, message: "Livrable introuvable" });
+            if (!owned) return res.status(403).json({ success: false, message: "Accès refusé" });
+            db.query(
+                "INSERT INTO Commentaire (contenu, id_utilisateur, id_livrable) VALUES (?, ?, ?)",
+                [contenu, req.session.userId, req.params.id],
+                (e2, result) => {
+                    if (e2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    res.json({ success: true, id_commentaire: result.insertId });
+                }
+            );
+        });
     });
 
     // --- ÉVALUATION ---
@@ -782,6 +897,31 @@ module.exports = function (db) {
             (err, results) => {
                 if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
                 res.json({ success: true, students: results });
+            }
+        );
+    });
+
+    // --- NOTIFICATIONS ---
+    router.get("/notifications", (req, res) => {
+        const userId = req.session.userId;
+        db.query(
+            "SELECT * FROM Notification WHERE id_utilisateur = ? ORDER BY date_creation DESC",
+            [userId],
+            (err, results) => {
+                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                res.json({ success: true, notifications: results });
+            }
+        );
+    });
+
+    router.patch("/notifications/:id/read", (req, res) => {
+        const userId = req.session.userId;
+        db.query(
+            "UPDATE Notification SET lu = TRUE WHERE id_notification = ? AND id_utilisateur = ?",
+            [req.params.id, userId],
+            (err) => {
+                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                res.json({ success: true });
             }
         );
     });

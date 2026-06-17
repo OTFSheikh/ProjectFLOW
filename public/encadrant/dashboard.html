@@ -43,6 +43,15 @@
         <main class="page-content">
             <div class="stats-grid" id="statsGrid"></div>
 
+            <div class="card" style="margin-bottom:1.25rem;">
+                <div class="section-header"><h3>Vue d'ensemble graphique</h3></div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1.5rem;">
+                    <div style="height:240px;"><canvas id="chartTasks"></canvas></div>
+                    <div style="height:240px;"><canvas id="chartGroups"></canvas></div>
+                    <div style="grid-column:1/-1; height:240px;"><canvas id="chartProgress"></canvas></div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="section-header">
                     <h3>Projets actifs</h3>
@@ -53,6 +62,7 @@
         </main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="sidebar.js"></script>
     <script>
         renderSidebar("dashboard");
@@ -104,6 +114,40 @@
             } else {
                 list.innerHTML = '<p style="color:var(--gray-400);font-size:0.82rem;padding:1rem 0;">Aucun projet. <a href="/encadrant/project-new.html" style="color:var(--primary);">Créer un projet</a></p>';
             }
+
+            loadCharts();
+        }
+
+        const STATUT_LABEL = { A_faire: "À faire", En_cours: "En cours", Terminee: "Terminé" };
+        const ETAT_LABEL = { Propose: "Proposé", Valide: "Validé", En_cours: "En cours", En_retard: "En retard", Livre: "Livré", Soutenu: "Soutenu", Cloture: "Clôturé", Ouvert: "Ouvert" };
+
+        async function loadCharts() {
+            const res = await fetch("/api/encadrant/dashboard/charts", { credentials: "include" });
+            const d = await res.json();
+            if (!d.success) return;
+            const baseOpts = { responsive: true, maintainAspectRatio: false };
+
+            const tOrder = ["A_faire", "En_cours", "Terminee"];
+            const tMap = {}; (d.tasksByStatus || []).forEach(r => tMap[r.statut] = r.n);
+            new Chart(document.getElementById("chartTasks"), {
+                type: "doughnut",
+                data: { labels: tOrder.map(s => STATUT_LABEL[s]), datasets: [{ data: tOrder.map(s => tMap[s] || 0), backgroundColor: ["#94a3b8", "#ea7d0b", "#16a34a"] }] },
+                options: { ...baseOpts, plugins: { title: { display: true, text: "Tâches par statut" }, legend: { position: "bottom" } } }
+            });
+
+            const groups = d.groupsByState || [];
+            new Chart(document.getElementById("chartGroups"), {
+                type: "doughnut",
+                data: { labels: groups.map(r => ETAT_LABEL[r.etat] || r.etat), datasets: [{ data: groups.map(r => r.n), backgroundColor: ["#94a3b8", "#6366f1", "#ea7d0b", "#dc2626", "#0ea5e9", "#16a34a", "#64748b"] }] },
+                options: { ...baseOpts, plugins: { title: { display: true, text: "Groupes par état" }, legend: { position: "bottom" } } }
+            });
+
+            const prog = d.progressByProject || [];
+            new Chart(document.getElementById("chartProgress"), {
+                type: "bar",
+                data: { labels: prog.map(p => p.nom), datasets: [{ label: "% terminé", data: prog.map(p => p.pct), backgroundColor: "#ea7d0b" }] },
+                options: { ...baseOpts, indexAxis: "y", scales: { x: { min: 0, max: 100 } }, plugins: { title: { display: true, text: "Avancement par projet (%)" }, legend: { display: false } } }
+            });
         }
 
         function esc(str) {
