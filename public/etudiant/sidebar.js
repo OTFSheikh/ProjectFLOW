@@ -6,7 +6,7 @@ function renderSidebar(activePage) {
     const links = [
         { id: "dashboard",     label: "Tableau de bord", icon: "fas fa-th-large",   href: "/etudiant/dashboard-student.html" },
         { id: "projects",      label: "Mes projets",     icon: "fas fa-folder",     href: "/etudiant/projects.html" },
-        { id: "notifications", label: "Notifications",   icon: "fas fa-bell",       href: "/etudiant/notifications.html", badge: 3 },
+        { id: "notifications", label: "Notifications",   icon: "fas fa-bell",       href: "/etudiant/notifications.html" },
         { id: "profile",       label: "Mon compte",      icon: "fas fa-user",       href: "/etudiant/profile.html" },
     ];
 

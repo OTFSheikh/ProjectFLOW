@@ -202,7 +202,7 @@
             const data = await res.json();
             const tasks = data.success ? data.tasks : [];
             const total = tasks.length;
-            const done = tasks.filter(t => t.statut === "Termine").length;
+            const done = tasks.filter(t => t.statut === "Terminee").length;
             const enCours = tasks.filter(t => t.statut === "En_cours").length;
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
@@ -283,11 +283,11 @@
             if (!data.success) return;
             const tasks = data.tasks;
 
-            const cols = { "A_faire": [], "En_cours": [], "Termine": [] };
+            const cols = { "A_faire": [], "En_cours": [], "Terminee": [] };
             tasks.forEach(t => { if (cols[t.statut]) cols[t.statut].push(t); else cols["A_faire"].push(t); });
 
-            const colLabels = { "A_faire": "À faire", "En_cours": "En cours", "Termine": "Terminé" };
-            const dotColors = { "A_faire": "var(--gray-400)", "En_cours": "var(--primary)", "Termine": "var(--secondary)" };
+            const colLabels = { "A_faire": "À faire", "En_cours": "En cours", "Terminee": "Terminé" };
+            const dotColors = { "A_faire": "var(--gray-400)", "En_cours": "var(--primary)", "Terminee": "var(--secondary)" };
 
             document.getElementById("tab-taches").innerHTML = `
                 <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:1rem;"><i class="fas fa-eye"></i> Vue en lecture seule — les tâches sont gérées par le Team Leader.</p>
