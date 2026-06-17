@@ -57,6 +57,29 @@ Importe le schéma depuis `plateforme_projets.sql`. Si tu pars d'une ancienne ve
 mysql -u root -p plateforme_projets < plateforme_projets.sql
 ```
 
+## Jeu de données de démonstration (seed)
+
+Le script `seed.js` remplit la base avec un jeu de données réaliste et volumineux (encadrants, étudiants, projets, groupes, jalons, tâches, livrables, messages, évaluations, notifications) — pratique pour les démonstrations et les tests.
+
+```bash
+node seed.js
+```
+
+Ce qu'il faut savoir :
+
+- **Prérequis** : la base doit déjà exister avec le schéma (`plateforme_projets.sql` importé) et le `.env` doit être configuré. Le script lit la connexion depuis le `.env`.
+- **Reset** : à chaque exécution, le script **vide toutes les données SAUF le compte admin**, puis régénère un nouveau jeu. Il est donc rejouable.
+- **Mot de passe commun** : tous les comptes générés utilisent le mot de passe `demo123`. Les emails suivent le format `prenom.nom@isen.demo`.
+- **Volumes** : ajustables en haut du fichier `seed.js` (nombre d'étudiants, de groupes par projet, etc.).
+
+Comptes utiles après le seed (mot de passe `demo123`) :
+
+- Encadrant : `awa.diallo@isen.demo`
+- Étudiant (Team Leader) : `yanis.cisse@isen.demo`
+- Admin : `admin@plateforme.local` / `admin123`
+
+> ⚠️ Le seed est destiné au développement / à la démo. Ne le lance pas sur une base de production : il supprime les données existantes.
+
 ## Connexion admin
 
 - Page : http://localhost:5000/login.html
@@ -104,4 +127,5 @@ utils/
   mailer.js            # Emails d'activation et de réinitialisation
 public/                # Front statique (admin / encadrant / etudiant)
 plateforme_projets.sql # Schéma de la base
+seed.js                # Jeu de données de démonstration (reset + remplissage)
 ```
