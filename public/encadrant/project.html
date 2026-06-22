@@ -7,9 +7,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link rel="stylesheet" href="common.css" />
     <style>
-        .group-card { border-left: 3px solid var(--secondary); position: relative; transition: border-color var(--transition); }
-        .group-card:hover { border-color: var(--gray-300); border-left-color: var(--secondary); }
-        .group-card.late { border-left-color: var(--danger); }
+        .group-card { position: relative; transition: border-color var(--transition); }
+        .group-card:hover { border-color: var(--gray-300); }
+        .group-card.late { border-left: 3px solid var(--danger); }
         .student-checkbox { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem; border-radius: var(--radius-sm); cursor: pointer; }
         .student-checkbox:hover { background: var(--gray-50); }
         .promo-badge { font-size: 0.68rem; background: var(--gray-100); color: var(--gray-600); padding: 0.12rem 0.4rem; border-radius: var(--radius-sm); font-weight: 500; }
@@ -130,7 +130,7 @@
             document.getElementById("projectMeta").innerHTML = `
                 <span><i class="fas fa-calendar"></i> ${new Date(p.date_debut).toLocaleDateString('fr-FR')} - ${new Date(p.date_fin).toLocaleDateString('fr-FR')}</span>
                 ${p.promo ? `<span class="promo-badge">${esc(p.promo)}</span>` : ''}
-                <span class="badge badge-success"><span class="badge-dot"></span> ${p.etat}</span>
+                ${etatBadge(p.etat)}
             `;
 
             document.getElementById("projectStats").innerHTML = `
@@ -157,7 +157,7 @@
                         <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:0.75rem;">${g.sujet_titre ? 'Sujet : ' + esc(g.sujet_titre) : 'Pas de sujet'}</p>
                         <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--gray-500);">
                             <span><i class="fas fa-users"></i> ${g.nb_membres} membres</span>
-                            <span class="badge badge-success"><span class="badge-dot"></span> ${g.etat}</span>
+                            ${etatBadge(g.etat)}
                         </div>
                     </a>
                 `).join("");

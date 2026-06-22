@@ -104,7 +104,7 @@
                 list.innerHTML = data2.projects.slice(0, 6).map(p => `
                     <a href="/encadrant/project.html?id=${p.id_projet}" class="project-row">
                         <span class="name">${esc(p.nom)}</span>
-                        <span class="badge badge-success"><span class="badge-dot"></span> ${p.etat}</span>
+                        ${etatBadge(p.etat)}
                         <span class="meta">
                             <span>${p.nb_groupes} gr.</span>
                             <span>${new Date(p.date_fin).toLocaleDateString('fr-FR')}</span>

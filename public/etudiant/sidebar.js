@@ -31,13 +31,6 @@ function renderSidebar(activePage) {
             `).join("")}
         </ul>
         <div class="sidebar-footer">
-            <div class="sidebar-profil">
-                <div class="sidebar-avatar" id="sidebarAvatar">SM</div>
-                <div class="sidebar-profil-info">
-                    <div class="sidebar-profil-name" id="sidebarName">Sophie Martin</div>
-                    <div class="sidebar-profil-role">Étudiante</div>
-                </div>
-            </div>
             <a href="#" class="sidebar-link" id="sidebarLogout">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>Déconnexion</span>
@@ -81,8 +74,10 @@ async function checkEtudiantAuth() {
             return null;
         }
         const initials = (data.utilisateur.prenom?.[0] || "") + (data.utilisateur.nom?.[0] || "");
-       document.getElementById("sidebarAvatar").textContent = initials.toUpperCase() || "??";
-        document.getElementById("sidebarName").textContent = `${data.utilisateur.prenom} ${data.utilisateur.nom}`;
+        const avatarEl = document.getElementById("sidebarAvatar");
+        if (avatarEl) avatarEl.textContent = initials.toUpperCase() || "??";
+        const nameEl = document.getElementById("sidebarName");
+        if (nameEl) nameEl.textContent = `${data.utilisateur.prenom} ${data.utilisateur.nom}`;
         return data.utilisateur;
     } catch {
         window.location.href = "/login.html";

@@ -56,7 +56,7 @@
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            background: var(--primary);
             color: white;
             display: flex;
             align-items: center;
@@ -85,22 +85,22 @@
            BANDEAU TEAM LEADER
         ============================================ */
         .team-leader-banner {
-            background: var(--primary-light);
-            border-left: 4px solid var(--primary);
+            background: var(--white);
+            border: 1px solid var(--gray-200);
             border-radius: var(--radius);
-            padding: 0.875rem 1.125rem;
+            padding: 0.75rem 1rem;
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
-            gap: 0.625rem;
-            font-size: 0.85rem;
-            color: var(--gray-800);
+            gap: 0.6rem;
+            font-size: 0.82rem;
+            color: var(--gray-700);
         }
         .team-leader-banner i {
             color: var(--primary);
-            font-size: 1rem;
+            font-size: 0.95rem;
         }
-        .team-leader-banner strong { color: var(--primary-dark); }
+        .team-leader-banner strong { color: var(--primary-dark); font-weight: 600; }
 
         /* ============================================
            ONGLETS
@@ -160,9 +160,9 @@
             font-size: 0.85rem;
         }
         .alert-warning {
-            background: var(--warning-light);
-            border-left: 4px solid var(--warning);
-            color: var(--gray-800);
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            color: var(--gray-700);
         }
         .alert-warning i { color: var(--warning); }
         .alert strong { font-weight: 600; }
@@ -307,7 +307,7 @@
         }
         .jalon-progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            background: var(--primary);
         }
         .jalon-progress-value {
             font-size: 0.7rem;
@@ -365,7 +365,7 @@
             width: 22px;
             height: 22px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            background: var(--primary);
             color: white;
             display: flex;
             align-items: center;
@@ -405,7 +405,7 @@
             margin-bottom: 0.5rem;
         }
         .deliv-card.refused {
-            border-left: 4px solid var(--danger);
+            border-color: var(--danger);
         }
         .deliv-icon {
             width: 38px;
@@ -534,7 +534,7 @@
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            background: var(--primary);
             color: white;
             display: flex;
             align-items: center;
@@ -589,7 +589,7 @@
             width: 30px;
             height: 30px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            background: var(--primary);
             color: white;
             display: flex;
             align-items: center;
@@ -798,7 +798,7 @@
             <!-- Bandeau Team Leader (affiché uniquement pour le TL via data-tl-only) -->
             <div class="team-leader-banner" id="tlBanner" data-tl-only style="display:none;">
                 <i class="fas fa-crown"></i>
-                <span>👑 Vous êtes <strong>Team Leader</strong> de ce groupe — vous pouvez créer les jalons et les tâches, les assigner, et choisir le sujet.</span>
+                <span>Vous êtes <strong>Team Leader</strong> de ce groupe — vous pouvez créer les jalons et les tâches, les assigner, et choisir le sujet.</span>
             </div>
 
             <!-- Onglets -->

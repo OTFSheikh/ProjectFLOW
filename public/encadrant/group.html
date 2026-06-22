@@ -119,7 +119,7 @@
             document.getElementById("groupTitle").textContent = groupData.nom;
             document.getElementById("groupSubtitle").textContent = groupData.sujet_titre ? `Sujet : ${groupData.sujet_titre}` : "";
             document.getElementById("progressBadge").innerHTML = `
-                <span class="badge badge-success"><span class="badge-dot"></span> ${groupData.etat}</span>
+                ${etatBadge(groupData.etat)}
             `;
 
             const initialTab = params.get("tab") || "apercu";
@@ -218,7 +218,7 @@
                     <div class="card">
                         <h3 style="font-size:0.95rem;margin-bottom:1rem;">Statut</h3>
                         <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
-                            <span class="badge badge-success"><span class="badge-dot"></span> ${groupData.etat}</span>
+                            ${etatBadge(groupData.etat)}
                         </div>
                         <p style="font-size:0.8rem;color:var(--gray-500);">Créé le ${new Date(groupData.date_creation).toLocaleDateString('fr-FR')}</p>
                     </div>

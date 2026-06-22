@@ -115,3 +115,24 @@ async function checkEncadrantAuth() {
         return null;
     }
 }
+
+
+/* ============================================
+   Badge d'état (groupe / projet) — une couleur par état
+   pour différencier En cours / En retard / Livré / Soutenu / Clôturé…
+============================================ */
+function etatBadge(etat) {
+    const map = {
+        Propose:    ["badge-gray",    "Proposé"],
+        Ouvert:     ["badge-success", "Ouvert"],
+        Valide:     ["badge-success", "Validé"],
+        En_cours:   ["badge-info",    "En cours"],
+        "En cours": ["badge-info",    "En cours"],
+        En_retard:  ["badge-danger",  "En retard"],
+        Livre:      ["badge-warning", "Livré"],
+        Soutenu:    ["badge-purple",  "Soutenu"],
+        Cloture:    ["badge-dark",    "Clôturé"],
+    };
+    const entry = map[etat] || ["badge-gray", etat];
+    return `<span class="badge ${entry[0]}"><span class="badge-dot"></span> ${entry[1]}</span>`;
+}

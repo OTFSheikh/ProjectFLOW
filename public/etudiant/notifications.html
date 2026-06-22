@@ -13,11 +13,11 @@
             background: var(--white); border: 1px solid var(--gray-200);
             border-radius: 10px; padding: 0.9rem 1rem; transition: background 0.15s;
         }
-        .notif-card.unread { background: var(--primary-light, #eef2ff); border-color: var(--primary, #6366f1); }
+        .notif-card.unread { background: var(--gray-50); border-color: var(--gray-200); border-left: 3px solid var(--gray-300); }
         .notif-icon {
             width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
-            background: var(--primary, #6366f1); color: #fff; font-size: 0.85rem;
+            background: #64748b; color: #fff; font-size: 0.85rem;
         }
         .notif-icon.message { background: #6366f1; }
         .notif-icon.systeme { background: #64748b; }
@@ -26,10 +26,10 @@
         .notif-meta { font-size: 0.7rem; color: var(--gray-500); margin-top: 0.25rem; }
         .notif-actions { display: flex; align-items: center; gap: 0.5rem; }
         .notif-read-btn {
-            border: none; background: transparent; color: var(--primary, #6366f1);
+            border: none; background: transparent; color: var(--gray-500);
             cursor: pointer; font-size: 0.72rem; white-space: nowrap;
         }
-        .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary, #6366f1); flex-shrink: 0; margin-top: 6px; }
+        .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gray-400); flex-shrink: 0; margin-top: 6px; }
         .notif-empty { color: var(--gray-500); font-size: 0.9rem; padding: 2rem 0; }
     </style>
 </head>
