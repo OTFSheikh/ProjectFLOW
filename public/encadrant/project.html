@@ -86,6 +86,7 @@
                 </div>
                 <div class="form-group">
                     <label>Étudiants</label>
+                    <input type="text" id="studentSearch" placeholder="Rechercher un étudiant…" autocomplete="off" style="width:100%;margin-bottom:0.6rem;" />
                     <div id="studentsList" style="max-height:250px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:0.5rem;"></div>
                 </div>
                 <div class="modal-actions">
@@ -124,6 +125,7 @@
             if (!data.success) { window.location.href = "/encadrant/projects.html"; return; }
 
             const p = data.project;
+            projectPromo = p.promo || null;
             document.getElementById("breadcrumbName").textContent = p.nom;
             document.getElementById("projectTitle").textContent = p.nom;
             document.getElementById("editProjectBtn").href = `/encadrant/project-edit.html?id=${projectId}`;
@@ -153,7 +155,8 @@
             } else {
                 document.getElementById("groupsGrid").innerHTML = data.groups.map(g => `
                     <a href="/encadrant/group.html?id=${g.id_groupe}" class="card group-card" style="text-decoration:none;color:inherit;">
-                        <h4 style="font-size:0.95rem;margin-bottom:0.5rem;">${esc(g.nom)}</h4>
+                        <button type="button" class="group-del-btn" data-del-group="${g.id_groupe}" data-group-nom="${esc(g.nom)}" title="Supprimer le groupe" style="position:absolute;top:8px;right:8px;border:none;background:none;color:var(--gray-400);cursor:pointer;font-size:0.8rem;padding:4px;line-height:1;"><i class="fas fa-trash"></i></button>
+                        <h4 style="font-size:0.95rem;margin-bottom:0.5rem;padding-right:1.5rem;">${esc(g.nom)}</h4>
                         <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:0.75rem;">${g.sujet_titre ? 'Sujet : ' + esc(g.sujet_titre) : 'Pas de sujet'}</p>
                         <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--gray-500);">
                             <span><i class="fas fa-users"></i> ${g.nb_membres} membres</span>
@@ -161,24 +164,60 @@
                         </div>
                     </a>
                 `).join("");
+
+                document.querySelectorAll("#groupsGrid [data-del-group]").forEach(b => {
+                    b.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        deleteGroup(b.dataset.delGroup, b.dataset.groupNom);
+                    });
+                });
             }
         }
 
         // Modal
+        let projectPromo = null;
+        let groupStudents = [];
+
+        // Rendu de la liste d'étudiants (filtrée par la recherche), en conservant
+        // les cases déjà cochées entre deux filtrages.
+        function renderStudentList() {
+            const q = (document.getElementById("studentSearch").value || "").toLowerCase().trim();
+            const checked = new Set([...document.querySelectorAll('#studentsList input:checked')].map(el => el.value));
+            const list = groupStudents.filter(s => {
+                if (!q) return true;
+                const full = `${s.prenom} ${s.nom}`.toLowerCase();
+                return full.includes(q) || `${s.nom} ${s.prenom}`.toLowerCase().includes(q);
+            });
+            const box = document.getElementById("studentsList");
+            if (!list.length) {
+                box.innerHTML = `<p style="color:var(--gray-400);font-size:0.8rem;padding:0.5rem;">Aucun étudiant trouvé.</p>`;
+                return;
+            }
+            box.innerHTML = list.map(s => `
+                <label class="student-checkbox">
+                    <input type="checkbox" value="${s.id_utilisateur}" ${checked.has(String(s.id_utilisateur)) ? 'checked' : ''} />
+                    <span>${esc(s.prenom)} ${esc(s.nom)} <small style="color:var(--gray-400);">(${s.classe || ''})</small></span>
+                </label>
+            `).join("");
+        }
+
         const modal = document.getElementById("modalOverlay");
         document.getElementById("createGroupBtn").addEventListener("click", async () => {
             modal.classList.add("active");
-            const res = await fetch("/api/encadrant/students", { credentials: "include" });
+            document.getElementById("studentSearch").value = "";
+            const url = projectPromo
+                ? `/api/encadrant/students?promo=${encodeURIComponent(projectPromo)}`
+                : "/api/encadrant/students";
+            const res = await fetch(url, { credentials: "include" });
             const data = await res.json();
             if (data.success) {
-                document.getElementById("studentsList").innerHTML = data.students.map(s => `
-                    <label class="student-checkbox">
-                        <input type="checkbox" value="${s.id_utilisateur}" />
-                        <span>${esc(s.prenom)} ${esc(s.nom)} <small style="color:var(--gray-400);">(${s.classe || ''})</small></span>
-                    </label>
-                `).join("");
+                groupStudents = data.students || [];
+                renderStudentList();
             }
         });
+
+        document.getElementById("studentSearch").addEventListener("input", renderStudentList);
 
         document.getElementById("cancelModal").addEventListener("click", () => modal.classList.remove("active"));
         modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("active"); });
@@ -343,8 +382,16 @@
             });
         });
 
-        function esc(str) { const d = document.createElement("div"); d.textContent = str || ""; return d.innerHTML; }
-        function showToast(msg, type = "success") {
+        function deleteGroup(id, nom) {
+            confirmModal(`Supprimer le groupe « ${nom} » ? Cette action est irréversible : ses tâches, livrables, messages et évaluation seront aussi supprimés.`, async () => {
+                const res = await fetch(`/api/encadrant/groups/${id}`, { method: "DELETE", credentials: "include" });
+                const data = await res.json();
+                if (data.success) { showToast("Groupe supprimé"); load(); }
+                else showToast(data.message || "Suppression impossible", "error");
+            });
+        }
+
+        function esc(str) { const d = document.createElement("div"); d.textContent = str || ""; return d.innerHTML; }        function showToast(msg, type = "success") {
             const t = document.getElementById("toast");
             t.textContent = msg; t.className = `toast show ${type}`;
             setTimeout(() => t.className = "toast", 3000);

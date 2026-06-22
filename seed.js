@@ -164,8 +164,8 @@ async function main() {
         const phase = phases[(i + Math.floor(i / encIds.length)) % phases.length];
         let dDeb, dFin, etat;
         if (phase === "termine") { dDeb = addMonths(NOW, -9); dFin = addMonths(NOW, -1); etat = "Cloture"; }
-        else if (phase === "encours") { dDeb = addMonths(NOW, -3); dFin = addMonths(NOW, 3); etat = "En cours"; }
-        else if (phase === "retard") { dDeb = addMonths(NOW, -5); dFin = addMonths(NOW, 1); etat = "En cours"; }
+        else if (phase === "encours") { dDeb = addMonths(NOW, -3); dFin = addMonths(NOW, 3); etat = "En_cours"; }
+        else if (phase === "retard") { dDeb = addMonths(NOW, -5); dFin = addMonths(NOW, 1); etat = "En_cours"; }
         else { dDeb = addDays(NOW, -7); dFin = addMonths(NOW, 5); etat = "Ouvert"; }
         const promo = pick(CLASSES);
         const pid = await ins(
@@ -215,7 +215,7 @@ const GROUP_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 function groupStatesForPhase(phase, nb) {
     const out = [];
     for (let i = 0; i < nb; i++) {
-        if (phase === "termine") out.push(i % 2 === 0 ? "Soutenu" : "Cloture");
+        if (phase === "termine") out.push("Soutenu");
         else if (phase === "encours") out.push(i === 0 ? "Livre" : (i === 1 ? "En_retard" : "En_cours"));
         else if (phase === "retard") out.push(i % 3 === 0 ? "En_cours" : "En_retard");
         else out.push(i % 2 === 0 ? "Propose" : "En_cours"); // nouveau

@@ -869,7 +869,6 @@
                 <div style="display:flex; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
                     <div class="filters-row" id="delivFilters"></div>
                     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                        <button class="btn btn-secondary" id="btnDeliver" style="display:none;"><i class="fas fa-flag-checkered"></i> Marquer comme Livré</button>
                         <button class="btn btn-primary" id="btnDeposit"><i class="fas fa-plus"></i> Déposer un livrable</button>
                     </div>
                 </div>
@@ -1172,26 +1171,6 @@
             location.reload();
         } else {
             uiToast((data && data.message) || "Choix impossible (statut " + status + ").", "error");
-        }
-    }
-
-    // Bouton « Marquer comme Livré » : visible seulement pour le TL d'un groupe
-    // En cours / En retard (Étape 8).
-    function updateDeliverButton() {
-        const b = document.getElementById("btnDeliver");
-        if (!b) return;
-        const etat = state.group ? state.group.etat : "";
-        const show = state.isTeamLeader && (etat === "En_cours" || etat === "En_retard");
-        b.style.display = show ? "" : "none";
-    }
-
-    async function markDelivered() {
-        if (!await uiConfirm("Cela indique que tous les livrables finaux ont été déposés.", { title: "Marquer le groupe comme « Livré » ?", okText: "Marquer livré" })) return;
-        const { ok, data, status } = await api("POST", `/groups/${state.groupId}/deliver`);
-        if (ok) {
-            location.reload();
-        } else {
-            uiToast((data && data.message) || "Action impossible (statut " + status + ").", "error");
         }
     }
 
@@ -1879,7 +1858,6 @@
 
         applyRole(state.isTeamLeader);
         renderHeader();
-        updateDeliverButton();
         renderSubject();
 
         setupChatSocket();
@@ -1901,7 +1879,6 @@
     document.getElementById("btnNewJalon").onclick = newJalon;
     document.getElementById("btnDeposit").onclick = () => openDepositModal();
     document.getElementById("btnSendMsg").onclick = sendMessage;
-    document.getElementById("btnDeliver").onclick = markDelivered;
     document.querySelectorAll("#taskFilters .filter-chip").forEach(chip => {
         chip.onclick = () => {
             document.querySelectorAll("#taskFilters .filter-chip").forEach(c => c.classList.remove("active"));

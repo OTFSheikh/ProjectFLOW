@@ -102,6 +102,24 @@ module.exports = function (db) {
         );
     }
 
+    // Bascule auto vers « Livré » : un groupe (En cours / En retard) passe « Livré »
+    // dès que TOUTES ses tâches sont terminées ET qu'au moins un livrable a été
+    // validé par l'encadrant. (Remplace l'ancien clic manuel « Livrer ».)
+    function maybeMarkDelivered(groupId, cb) {
+        db.query(
+            `UPDATE Groupe g SET g.etat = 'Livre'
+             WHERE g.id_groupe = ? AND g.etat IN ('En_cours','En_retard')
+               AND EXISTS (SELECT 1 FROM Livrable l
+                           WHERE l.id_groupe = g.id_groupe AND l.statut_validation = 'Valide')
+               AND EXISTS (SELECT 1 FROM Jalon j JOIN Tache t ON t.id_jalon = j.id_jalon
+                           WHERE j.id_groupe = g.id_groupe)
+               AND NOT EXISTS (SELECT 1 FROM Jalon j JOIN Tache t ON t.id_jalon = j.id_jalon
+                               WHERE j.id_groupe = g.id_groupe AND t.statut <> 'Terminee')`,
+            [groupId],
+            (err) => cb && cb(err || null)
+        );
+    }
+
     // Insère une notification pour une liste d'utilisateurs (déduplication +
     // ignore les vides). type : voir les catégories du front (assignation,
     // livrable, chat, validation, refus, systeme, ...). idProjet : lien "Voir le projet".
@@ -762,7 +780,8 @@ module.exports = function (db) {
 
             db.query("UPDATE Tache SET statut = ? WHERE id_tache = ?", [statut, taskId], (err) => {
                 if (err) return res.status(500).json({ success: false, error: err.message });
-                res.json({ success: true });
+                // Toutes les tâches terminées + un livrable validé => groupe « Livré »
+                maybeMarkDelivered(row.id_groupe, () => res.json({ success: true }));
             });
         });
     });

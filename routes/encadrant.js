@@ -321,7 +321,10 @@ module.exports = function (db) {
                     db.query("INSERT INTO Membre_de (id_utilisateur, id_groupe, est_team_leader) VALUES ?", [membreValues], () => {});
                 }
 
-                res.status(201).json({ success: true, message: "Groupe créé", groupId });
+                // Création d'un groupe -> le projet passe automatiquement de « Ouvert » à « En cours »
+                db.query("UPDATE Projet SET etat = 'En_cours' WHERE id_projet = ? AND etat = 'Ouvert'", [req.params.id], () => {
+                    res.status(201).json({ success: true, message: "Groupe créé", groupId });
+                });
             });
         });
     });
@@ -409,6 +412,28 @@ module.exports = function (db) {
                     } else {
                         res.json({ success: true, message: "Groupe modifié" });
                     }
+                });
+            }
+        );
+    });
+
+    // --- SUPPRIMER UN GROUPE ---
+    // Réservé à l'encadrant propriétaire du projet. La suppression est en cascade
+    // (membres, jalons, tâches, livrables, messages, évaluation) via les FK ON DELETE CASCADE.
+    router.delete("/groups/:id", (req, res) => {
+        const userId = req.session.userId;
+        db.query(
+            `SELECT g.id_groupe FROM Groupe g
+             JOIN Projet p ON g.id_projet = p.id_projet
+             WHERE g.id_groupe = ? AND p.id_utilisateur = ?`,
+            [req.params.id, userId],
+            (err, results) => {
+                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                if (results.length === 0) return res.status(404).json({ success: false, message: "Groupe introuvable" });
+
+                db.query("DELETE FROM Groupe WHERE id_groupe = ?", [req.params.id], (err2) => {
+                    if (err2) return res.status(500).json({ success: false, message: "Erreur serveur" });
+                    res.json({ success: true, message: "Groupe supprimé" });
                 });
             }
         );
@@ -584,6 +609,23 @@ module.exports = function (db) {
         });
     });
 
+    // Bascule auto vers « Livré » : un groupe (En cours / En retard) passe « Livré »
+    // dès que TOUTES ses tâches sont terminées ET qu'au moins un livrable est validé.
+    function maybeMarkDelivered(groupId, cb) {
+        db.query(
+            `UPDATE Groupe g SET g.etat = 'Livre'
+             WHERE g.id_groupe = ? AND g.etat IN ('En_cours','En_retard')
+               AND EXISTS (SELECT 1 FROM Livrable l
+                           WHERE l.id_groupe = g.id_groupe AND l.statut_validation = 'Valide')
+               AND EXISTS (SELECT 1 FROM Jalon j JOIN Tache t ON t.id_jalon = j.id_jalon
+                           WHERE j.id_groupe = g.id_groupe)
+               AND NOT EXISTS (SELECT 1 FROM Jalon j JOIN Tache t ON t.id_jalon = j.id_jalon
+                               WHERE j.id_groupe = g.id_groupe AND t.statut <> 'Terminee')`,
+            [groupId],
+            (err) => cb && cb(err || null)
+        );
+    }
+
     router.patch("/deliverables/:id/validate", (req, res) => {
         let { statut, commentaire } = req.body;
         // Le front étudiant attend 'Valide' / 'Refuse'. On tolère l'ancien 'Rejete'.
@@ -595,7 +637,7 @@ module.exports = function (db) {
 
         // Vérifie que ce livrable appartient à un groupe d'un projet de cet encadrant.
         const sqlOwn = `
-            SELECT p.id_utilisateur AS owner
+            SELECT p.id_utilisateur AS owner, g.id_groupe AS id_groupe
             FROM Livrable l
             JOIN Groupe g ON g.id_groupe = l.id_groupe
             JOIN Projet p ON p.id_projet = g.id_projet
@@ -614,6 +656,7 @@ module.exports = function (db) {
                     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Livrable introuvable" });
 
                     // Notifier l'étudiant qui a déposé le livrable (feedback encadrant)
+                    const sendNotif = () => {
                     const sqlInfo = `
                         SELECT l.nom, l.id_etudiant_deposant, g.id_projet
                         FROM Livrable l
@@ -636,6 +679,12 @@ module.exports = function (db) {
                             res.json({ success: true, message: "Livrable mis à jour" });
                         }
                     });
+                    };
+
+                    // Si validé : vérifier si le groupe peut passer « Livré »
+                    // (toutes les tâches terminées + ce livrable validé), puis notifier.
+                    if (statut === "Valide") maybeMarkDelivered(ownRows[0].id_groupe, sendNotif);
+                    else sendNotif();
                 }
             );
         });
@@ -719,6 +768,23 @@ module.exports = function (db) {
         const groupId = req.params.id;
         const { commentaire_global, note_finale, notes } = req.body;
 
+        // Évaluer un groupe le fait passer à « Soutenu », puis si TOUS les groupes
+        // du projet sont « Soutenu », le projet passe automatiquement à « Clôturé ».
+        const finalizeEval = (cb) => {
+            db.query("UPDATE Groupe SET etat = 'Soutenu' WHERE id_groupe = ?", [groupId], () => {
+                db.query(
+                    `UPDATE Projet p
+                     SET p.etat = 'Cloture'
+                     WHERE p.id_projet = (SELECT id_projet FROM Groupe WHERE id_groupe = ?)
+                       AND p.etat <> 'Cloture'
+                       AND NOT EXISTS (SELECT 1 FROM Groupe g
+                                       WHERE g.id_projet = p.id_projet AND g.etat <> 'Soutenu')`,
+                    [groupId],
+                    () => cb()
+                );
+            });
+        };
+
         db.query("SELECT id_evaluation FROM Evaluation WHERE id_groupe = ?", [groupId], (err, existing) => {
             if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
 
@@ -735,7 +801,9 @@ module.exports = function (db) {
                                 db.query("INSERT INTO Note_sur (id_evaluation, id_critere, note) VALUES ?", [noteValues], () => {});
                             });
                         }
-                        res.json({ success: true, message: "Évaluation mise à jour" });
+                        finalizeEval(() => {
+                            res.json({ success: true, message: "Évaluation mise à jour" });
+                        });
                     }
                 );
             } else {
@@ -749,7 +817,9 @@ module.exports = function (db) {
                             const noteValues = notes.map(n => [evalId, n.id_critere, n.note]);
                             db.query("INSERT INTO Note_sur (id_evaluation, id_critere, note) VALUES ?", [noteValues], () => {});
                         }
-                        res.status(201).json({ success: true, message: "Évaluation créée" });
+                        finalizeEval(() => {
+                            res.status(201).json({ success: true, message: "Évaluation créée" });
+                        });
                     }
                 );
             }
@@ -891,14 +961,20 @@ module.exports = function (db) {
     });
 
     // --- ÉTUDIANTS DISPONIBLES (pour créer un groupe) ---
+    // Optionnel : ?promo=ISEN 3 pour ne renvoyer que les étudiants de la classe du projet.
     router.get("/students", (req, res) => {
-        db.query(
-            "SELECT id_utilisateur, nom, prenom, email, classe FROM Utilisateur WHERE est_etudiant = TRUE AND est_actif = TRUE ORDER BY nom, prenom",
-            (err, results) => {
-                if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
-                res.json({ success: true, students: results });
-            }
-        );
+        const { promo } = req.query;
+        let sql = "SELECT id_utilisateur, nom, prenom, email, classe FROM Utilisateur WHERE est_etudiant = TRUE AND est_actif = TRUE";
+        const params = [];
+        if (promo) {
+            sql += " AND classe = ?";
+            params.push(promo);
+        }
+        sql += " ORDER BY nom, prenom";
+        db.query(sql, params, (err, results) => {
+            if (err) return res.status(500).json({ success: false, message: "Erreur serveur" });
+            res.json({ success: true, students: results });
+        });
     });
 
     // --- NOTIFICATIONS ---
